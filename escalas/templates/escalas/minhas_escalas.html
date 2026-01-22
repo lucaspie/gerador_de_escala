@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Minhas Escalas{% endblock %}
+
+{% block content %}
+<h3 class="mb-3">📅 Minhas Escalas</h3>
+
+{% if escalas %}
+  {% for escala in escalas %}
+    <div class="card mb-4">
+      <div class="card-header">
+        Semana {{ escala.data_inicio }} → {{ escala.data_fim }}
+      </div>
+
+      <div class="card-body">
+        {% for dia in escala.dias.all %}
+          <div class="mb-2">
+            <strong>{{ dia.data }}</strong>
+            {% if dia.tipo_dia == "NAO" %}
+              <span class="badge bg-warning text-dark">
+                Não útil
+              </span>
+            {% endif %}
+          </div>
+
+          <ul class="list-group mb-3">
+            {% for turno in dia.turnos.all %}
+              {% for alocacao in turno.alocacoes.all %}
+                {% if alocacao.usuario == user %}
+                  <li class="list-group-item d-flex justify-content-between">
+                    <span>
+                      {{ turno.get_turno_display }}
+                      {% if alocacao.tipo == "RES" %}
+                        (Reserva)
+                      {% else %}
+                        (Titular)
+                      {% endif %}
+                    </span>
+
+                    {% if dia.tipo_dia == "NAO" %}
+                      <span class="badge bg-info">
+                        Sobreaviso
+                      </span>
+                    {% endif %}
+                  </li>
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+          </ul>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-info">
+    Você não possui escalas publicadas no momento.
+  </div>
+{% endif %}
+{% endblock %}

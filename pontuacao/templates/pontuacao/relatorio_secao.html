@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Pontuação da Seção{% endblock %}
+
+{% block content %}
+<h3>📊 Pontuação da Seção</h3>
+
+<table class="table table-striped mt-3">
+  <thead>
+    <tr>
+      <th>Colaborador</th>
+      <th>Total de Pontos</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in pontuacoes %}
+      <tr>
+        <td>
+          {{ p.usuario__username }}
+        </td>
+        <td><strong>{{ p.total }}</strong></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

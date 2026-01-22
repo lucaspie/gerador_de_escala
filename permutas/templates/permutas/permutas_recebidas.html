@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Permutas Recebidas{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-3">📥 Permutas Diretas Recebidas</h3>
+
+  {% if permutas %}
+    <div class="card shadow-sm">
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Solicitante</th>
+              <th>Data</th>
+              <th>Turno</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in permutas %}
+              <tr>
+                <td>{{ p.alocacao_origem.usuario.username }}</td>
+                <td>
+                  {{ p.alocacao_origem.turno.dia.data|date:"d/m/Y" }}
+                </td>
+                <td>
+                  {{ p.alocacao_origem.turno.get_turno_display }}
+                </td>
+                <td>
+                  <a href="{% url 'permutas:aceitar_direta' p.id %}"
+                     class="btn btn-success btn-sm">
+                    ✔ Aceitar
+                  </a>
+
+                  <a href="{% url 'permutas:rejeitar_direta' p.id %}"
+                     class="btn btn-outline-danger btn-sm ms-1">
+                    ✖ Rejeitar
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    <div class="alert alert-info">
+      Nenhuma permuta direta pendente no momento.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

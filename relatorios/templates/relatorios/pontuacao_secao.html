@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Relatório de Pontuação{% endblock %}
+
+{% block content %}
+<h3>📊 Pontuação da Seção</h3>
+
+<form method="get" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <label>Data início</label>
+        <input type="date" name="data_inicio" value="{{ data_inicio }}" class="form-control">
+    </div>
+
+    <div class="col-md-3">
+        <label>Data fim</label>
+        <input type="date" name="data_fim" value="{{ data_fim }}" class="form-control">
+    </div>
+
+    <div class="col-md-2 align-self-end">
+        <button class="btn btn-primary w-100">
+            Filtrar
+        </button>
+    </div>
+
+    <div class="col-md-2 align-self-end">
+        <a href="{% url 'relatorios:exportar_excel' %}?data_inicio={{ data_inicio }}&data_fim={{ data_fim }}"
+            class="btn btn-success w-100">
+            Exportar Excel
+        </a>
+    </div>
+
+    <a href="{% url 'relatorios:exportar_pdf' %}?data_inicio={{ data_inicio }}&data_fim={{ data_fim }}"
+        class="btn btn-danger w-100">
+        Exportar PDF
+    </a>
+
+
+</form>
+
+<div class="col-md-12">
+  <div class="card shadow-sm h-100 border-warning">
+    <div class="card-body">
+      <h5 class="card-title">⚠️ Indisponibilidades (próx. 30 dias)</h5>
+
+      {% if indisponibilidades %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mt-2">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Período</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in indisponibilidades %}
+              <tr>
+                <td>{{ i.usuario.username }}</td>
+                <td>
+                  {{ i.data_inicio|date:"d/m" }}
+                  →
+                  {{ i.data_fim|date:"d/m" }}
+                </td>
+                <td>
+                  {{ i.get_motivo_display }}
+                  {% if i.observacao %}
+                    <span
+                      title="{{ i.observacao }}"
+                      class="text-muted"
+                    >ℹ️</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <a href="{% url 'indisponibilidade:lista_secao' %}"
+           class="btn btn-outline-warning btn-sm w-100">
+          Ver todas
+        </a>
+
+      {% else %}
+        <p class="text-muted mt-3">
+          Nenhuma indisponibilidade registrada no período.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Usuário</th>
+            <th>Pontos</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for d in dados %}
+        <tr>
+            <td>{{ d.usuario__username }}</td>
+            <td><strong>{{ d.total }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<hr>
+<h4>🚨 Relatório de Sobreaviso</h4>
+
+<table class="table table-bordered">
+  <thead class="table-danger">
+    <tr>
+      <th>Usuário</th>
+      <th>Total Sobreavisos</th>
+      <th>Vezes Acionado</th>
+      <th>Pontos</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in sobreavisos %}
+    <tr>
+      <td>{{ s.usuario__username }}</td>
+      <td>{{ s.total_sobreavisos }}</td>
+      <td>
+        <span class="badge bg-danger">
+          {{ s.acionamentos }}
+        </span>
+      </td>
+      <td><strong>{{ s.pontos|default:0 }}</strong></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<hr>
+
+<h5>📈 Visualização</h5>
+<canvas id="graficoPontuacao"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('graficoPontuacao');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ labels| safe }},
+        datasets: [{
+            label: 'Pontuação',
+            data: {{ valores| safe }},
+          }]
+        },
+    });
+</script>
+{% endblock %}

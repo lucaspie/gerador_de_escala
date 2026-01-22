@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Minha Pontuação{% endblock %}
+
+{% block content %}
+<h3>👤 Minha Pontuação</h3>
+
+<div class="alert alert-info">
+  Total acumulado: <strong>{{ total }}</strong> pontos
+</div>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Semana</th>
+      <th>Data</th>
+      <th>Turno</th>
+      <th>Pontos</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in pontuacoes %}
+      <tr>
+        <td>{{ p.alocacao.turno.dia.escala.data_inicio }}</td>
+        <td>{{ p.alocacao.turno.dia.data }}</td>
+        <td>{{ p.alocacao.turno.get_turno_display }}</td>
+        <td>{{ p.pontos }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

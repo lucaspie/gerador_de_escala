@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Permuta Direta{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+  <h4>🔄 Solicitar Permuta Direta</h4>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <p><strong>Sua escala:</strong></p>
+      <p>
+        {{ alocacao_origem.turno.dia.data|date:"d/m/Y" }} -
+        {{ alocacao_origem.turno.get_turno_display }}
+      </p>
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label">Escolha a escala para trocar</label>
+          <select name="alocacao_destino" class="form-select" required>
+            <option value="">---</option>
+            {% for a in alocacoes_possiveis %}
+              <option value="{{ a.id }}">
+                {{ a.usuario.username }} —
+                {{ a.turno.dia.data|date:"d/m/Y" }} —
+                {{ a.turno.get_turno_display }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <button class="btn btn-primary">
+          Solicitar Permuta
+        </button>
+        <a href="{% url 'permutas:minhas_permutas' %}" class="btn btn-secondary">
+          Cancelar
+        </a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

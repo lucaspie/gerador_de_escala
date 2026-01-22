@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Minhas Escalas{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Escalas da Seção</h3>
+
+{% if escalas %}
+<table class="table table-hover align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>Período</th>
+            <th>Status</th>
+            <th>Criada em</th>
+            <th class="text-end">Ações</th>
+            <th class="text-end">Apagar</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for escala in escalas %}
+        <tr>
+            <td>
+                {{ escala.data_inicio }} a {{ escala.data_fim }}
+            </td>
+            <td>
+                {% if escala.status == "RASC" %}
+                <span class="badge bg-secondary">Rascunho</span>
+                {% elif escala.status == "PUB" %}
+                <span class="badge bg-success">Publicada</span>
+                {% else %}
+                <span class="badge bg-dark">Encerrada</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if escala.tipo == "SOB" %}
+                <strong>{{ escala.data_inicio }}</strong>
+                <span class="badge bg-warning text-dark ms-2">
+                    Sobreaviso
+                </span>
+                {% else %}
+                {{ escala.data_inicio }} a {{ escala.data_fim }}
+                {% endif %}
+            </td>
+
+            <td class="text-end">
+                <a href="{% url 'escalas:detalhe_escala' escala.id %}" class="btn btn-sm btn-outline-primary">
+                    Abrir
+                </a>
+
+                {% if escala.status == "RASC" %}
+                <a href="{% url 'escalas:publicar' escala.id %}" class="btn btn-sm btn-outline-success">
+                    Publicar
+                </a>
+                {% endif %}
+
+                {% if escala.status == "PUB" %}
+                <a href="{% url 'escalas:encerrar' escala.id %}" class="btn btn-sm btn-outline-danger">
+                    Encerrar
+                </a>
+                {% endif %}
+            </td>
+            <td>
+                {% if escala.status == "RASC" %}
+                <a href="{% url 'escalas:apagar_escala' escala.id %}" class="btn btn-sm btn-outline-danger">
+                    Apagar
+                </a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="alert alert-info">
+    Nenhuma escala criada ainda.
+</div>
+{% endif %}
+{% endblock %}

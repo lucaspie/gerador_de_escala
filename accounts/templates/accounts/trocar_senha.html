@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>🔐 Troca de senha obrigatória</h2>
+
+<p>
+    Por segurança, você precisa definir uma nova senha antes de continuar.
+</p>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <button type="submit" class="btn btn-success">
+        Atualizar senha
+    </button>
+</form>
+
+{% endblock %}

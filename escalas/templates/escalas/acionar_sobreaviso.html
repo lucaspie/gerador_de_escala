@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Acionar Sobreaviso{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+  <h4>⚠️ Acionar Sobreaviso</h4>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <p><strong>Operador:</strong> {{ alocacao.usuario.username }}</p>
+      <p><strong>Data:</strong> {{ alocacao.turno.dia.data|date:"d/m/Y" }}</p>
+      <p><strong>Turno:</strong> {{ alocacao.turno.get_turno_display }}</p>
+
+      <form method="post">
+        {% csrf_token %}
+        <button class="btn btn-danger">
+          Confirmar acionamento
+        </button>
+        <a href="{% url 'escalas:detalhe_escala' alocacao.turno.dia.escala.id %}"
+           class="btn btn-secondary">
+          Cancelar
+        </a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

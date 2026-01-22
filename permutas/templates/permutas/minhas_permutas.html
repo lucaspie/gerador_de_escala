@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Minhas Permutas{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3>🔄 Minhas Permutas</h3>
+
+  {% if permutas %}
+    <table class="table table-striped mt-3 align-middle">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Turno</th>
+          <th>Tipo</th>
+          <th>Solicitante</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in permutas %}
+        <tr>
+          <td>{{ p.alocacao_origem.turno.dia.data|date:"d/m/Y" }}</td>
+          <td>{{ p.alocacao_origem.turno.get_turno_display }}</td>
+          <td>{{ p.get_tipo_display }}</td>
+
+          <td>
+            {{ p.solicitante.username }}
+            {% if p.solicitante == user %}
+              <span class="badge bg-info ms-1">Você</span>
+            {% endif %}
+          </td>
+
+          <td>
+            <span class="badge
+              {% if p.status == 'PENDENTE' %}bg-warning
+              {% elif p.status == 'ACEITA' %}bg-success
+              {% else %}bg-secondary{% endif %}">
+              {{ p.get_status_display }}
+            </span>
+          </td>
+
+          <td>
+            {# === AÇÕES PARA PERMUTA DIRETA RECEBIDA === #}
+            {% if p.tipo == "DIRETA"   and p.status == "PENDENTE"   and p.alocacao_destino.usuario == user %}
+
+              <a href="{% url 'permutas:aceitar_direta' p.id %}"
+                 class="btn btn-success btn-sm">
+                Aceitar
+              </a>
+
+              <a href="{% url 'permutas:rejeitar_direta' p.id %}"
+                 class="btn btn-danger btn-sm">
+                Rejeitar
+              </a>
+
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="alert alert-info mt-3">
+      Nenhuma permuta encontrada.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

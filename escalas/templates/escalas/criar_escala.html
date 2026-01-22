@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Criar Escala{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 500px;">
+  <h3 class="mb-4">Criar Escala Semanal</h3>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      {{ form.data_inicio.label_tag }}
+      {{ form.data_inicio }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.qtd_madrugada.label_tag }}
+      {{ form.qtd_madrugada }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.qtd_noturno.label_tag }}
+      {{ form.qtd_noturno }}
+    </div>
+
+    <button type="submit" class="btn btn-primary w-100">
+      Gerar Escala
+    </button>
+  </form>
+</div>
+{% endblock %}

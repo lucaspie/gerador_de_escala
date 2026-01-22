@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="mb-3">👥 Usuários</h2>
+
+<a href="{% url 'accounts:cadastrar_usuario' %}" class="btn btn-success mb-3">
+    ➕ Novo usuário
+</a>
+
+<table class="table table-hover align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>Usuário</th>
+            <th>Nome</th>
+            <th>Seção</th>
+            <th>Papel</th>
+            <th>Cursos</th>
+            <th class="text-end">Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for usuario in usuarios %}
+        <tr>
+            <td>{{ usuario.username }}</td>
+            <td>{{ usuario.get_full_name }}</td>
+            <td>{{ usuario.secao.nome }}</td>
+            <td>
+                <span class="badge bg-secondary">
+                    {{ usuario.get_papel_display }}
+                </span>
+            </td>
+            <td>
+                {% if usuario.cursos.all %}
+                {% for curso in usuario.cursos.all %}
+                <span class="badge bg-info text-dark">
+                    {{ curso.get_codigo_display }}
+                </span>
+                {% endfor %}
+                {% else %}
+                <span class="text-muted">Nenhum</span>
+                {% endif %}
+            </td>
+            <td class="text-end">
+                <a href="{% url 'accounts:editar_usuario' usuario.id %}" class="btn btn-sm btn-outline-primary">
+                    Editar
+                </a>
+                <a href="{% url 'accounts:resetar_senha_usuario' usuario.id %}" class="btn btn-sm btn-outline-warning"
+                    onclick="return confirm('Resetar senha deste usuário?')">
+                    Resetar senha
+                </a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-muted text-center">
+                Nenhum usuário cadastrado.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Nova Indisponibilidade{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+
+  <h3 class="mb-4">➕ Nova Indisponibilidade</h3>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label class="form-label">Data início</label>
+      {{ form.data_inicio }}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Data fim</label>
+      {{ form.data_fim }}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Motivo</label>
+      {{ form.motivo }}
+    </div>
+
+    <div class="alert alert-secondary">
+      ⚠️ Após salvar, a indisponibilidade será considerada automaticamente
+      na geração das escalas.
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <a href="{% url 'indisponibilidades:minhas' %}" class="btn btn-outline-secondary">
+        Cancelar
+      </a>
+      <button type="submit" class="btn btn-success">
+        Salvar
+      </button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

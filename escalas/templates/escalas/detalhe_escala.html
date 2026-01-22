@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Escala Semanal{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">
+  Escala — {{ escala.secao.nome }}
+  <small class="text-muted">
+    {{ escala.data_inicio }} a {{ escala.data_fim }}
+  </small>
+  {% if pode_editar %}
+  <a href="{% url 'escalas:apagar_escala' escala.id %}" class="btn btn-outline-danger">
+    Apagar Escala
+  </a>
+  {% endif %}
+
+</h3>
+
+{% for dia in escala.dias.all %}
+<div class="card mb-3">
+  <div class="card-header fw-bold">
+    {{ dia.data }} — {{ dia.get_tipo_dia_display }}
+
+    {% if alocacao.tipo == "SOBREAVISO" %}
+    <span class="badge bg-warning text-dark ms-2">
+      Sobreaviso
+    </span>
+    {% endif %}
+
+    {% if alocacao.foi_acionado %}
+    <span class="badge bg-danger ms-2">
+      Acionado
+    </span>
+    {% endif %}
+    {% if alocacao.tipo == "SOB" and not alocacao.foi_acionado %}
+    <a href="{% url 'escalas:acionar_sobreaviso' alocacao.id %}" class="btn btn-sm btn-danger">
+      ⚠️ Acionar
+    </a>
+    {% endif %}
+
+  </div>
+
+
+  <div class="card-body">
+    <div class="row">
+      {% for turno in dia.turnos.all %}
+      <div class="col-md-6">
+        <h5>{{ turno.get_turno_display }}</h5>
+
+        <ul class="list-group mb-2">
+          {% for alocacao in turno.alocacoes.all %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span>
+              {{ alocacao.usuario.username }}
+              {% if turno.alocacoes.count == 0 %}
+          <li class="list-group-item text-muted">
+            Nenhum militar escalado
+          </li>
+          {% endif %}
+
+          {% if alocacao.tipo == "RES" %}
+          <span class="badge bg-warning text-dark ms-2">Reserva</span>
+          {% endif %}
+          </span>
+          {% if alocacao.tipo == "RES" and not alocacao.foi_acionado and escala.status == "PUB" %}
+          <a href="{% url 'escalas:acionar_reserva' alocacao.id %}" class="btn btn-sm btn-danger ms-4">
+            ⚠️ Acionar Reserva
+          </a>
+          {% endif %}
+
+          {% if alocacao.tipo == "SOB" %}
+          <span class="badge bg-warning text-dark">Sobreaviso</span>
+
+          {% if not alocacao.foi_acionado and escala.status == "PUB" %}
+          <a href="{% url 'escalas:acionar_sobreaviso' alocacao.id %}" class="btn btn-sm btn-danger ms-2">
+            Acionar
+          </a>
+          {% else %}
+          <span class="badge bg-danger ms-2">ACIONADO</span>
+          {% endif %}
+          {% endif %}
+
+          <a href="{% url 'escalas:editar_turno' turno.id %}" class="btn btn-sm btn-outline-secondary">
+            Editar
+          </a>
+
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted">
+            Sem alocações
+          </li>
+          {% endfor %}
+        </ul>
+
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% if pode_editar %}
+<div class="d-flex gap-2 mt-4">
+  <a href="{% url 'escalas:publicar' escala.id %}" class="btn btn-success">
+    Publicar Escala
+  </a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Pedidos de Permuta{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3>📋 Pedidos de Permuta</h3>
+
+  {% if permutas %}
+    <table class="table table-hover mt-3">
+      <thead>
+        <tr>
+          <th>Solicitante</th>
+          <th>Data</th>
+          <th>Turno</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in permutas %}
+        <tr>
+          <td>{{ p.solicitante.username }}</td>
+          <td>{{ p.alocacao_origem.turno.dia.data|date:"d/m/Y" }}</td>
+          <td>{{ p.alocacao_origem.turno.get_turno_display }}</td>
+          <td>{{ p.get_status_display }}</td>
+          <td>
+            <a href="{% url 'permutas:aprovar' p.id %}"
+               class="btn btn-success btn-sm">
+              Aprovar
+            </a>
+            <a href="{% url 'permutas:rejeitar' p.id %}"
+               class="btn btn-danger btn-sm">
+              Rejeitar
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="alert alert-info mt-3">
+      Nenhum pedido pendente.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

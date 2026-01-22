@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Semanas{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Semanas de Escala</h3>
+
+<table class="table table-hover align-middle">
+  <thead class="table-dark">
+    <tr>
+      <th>Semana</th>
+      <th>Status</th>
+      <th class="text-end">Ação</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for semana in semanas %}
+    <tr>
+      <td>
+        {{ semana.inicio }} a {{ semana.fim }}
+      </td>
+
+      <td>
+        {% if semana.escala %}
+          {% if semana.escala.status == "RASC" %}
+            <span class="badge bg-secondary">Rascunho</span>
+          {% elif semana.escala.status == "PUB" %}
+            <span class="badge bg-success">Publicada</span>
+          {% else %}
+            <span class="badge bg-dark">Encerrada</span>
+          {% endif %}
+        {% else %}
+          <span class="badge bg-light text-dark">
+            Não criada
+          </span>
+        {% endif %}
+      </td>
+
+      <td class="text-end">
+        {% if semana.escala %}
+          <a href="{% url 'escalas:detalhe_escala' semana.escala.id %}"
+             class="btn btn-sm btn-outline-primary">
+            Abrir
+          </a>
+        {% else %}
+          <a href="{% url 'escalas:criar_escala' %}?data_inicio={{ semana.inicio }}"
+             class="btn btn-sm btn-primary">
+            Criar Escala
+          </a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

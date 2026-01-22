@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+  <h2>📟 Criar Sobreaviso</h2>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+      <label>Data</label>
+      <input type="date" name="data" class="form-control" required>
+    </div>
+
+    <div class="mb-3">
+      <label>Quantidade de militares</label>
+      <input type="number" name="quantidade" class="form-control" min="1" required>
+    </div>
+
+    <button class="btn btn-danger">
+      Criar Sobreaviso
+    </button>
+  </form>
+</div>
+
+{% endblock %}

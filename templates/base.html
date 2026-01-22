@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Sistema de Escalas{% endblock %}</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body class="bg-light">
+  {% if user.is_authenticated %}
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">Escalas</a>
+
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          {% if user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'accounts:minhas_escalas' %}">
+              Minhas Escalas
+            </a>
+          </li>
+
+          {% if user.pode_escalar %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'escalas:criar_escala' %}">
+              Criar Escala
+            </a>
+          </li>
+          {% endif %}
+          {% endif %}
+        </ul>
+
+        {% if user.is_authenticated %}
+        <span class="navbar-text text-white me-3">
+          {{ user.first_name }} ({{ user.get_papel_display }})
+        </span>
+
+        <form action="{% url 'logout' %}" method="post" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-light btn-sm">
+            Sair
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+
+  <div class="container">
+    {% if messages %}
+    <div class="container mt-3">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>

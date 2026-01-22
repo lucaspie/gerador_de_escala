@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Acionar Reserva{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">
+    {{ alocacao.turno.dia.data }} —
+    {{ alocacao.turno.get_turno_display }}
+</h4>
+
+<p>
+    Reserva: <strong>{{ alocacao.usuario.username }}</strong>
+</p>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">
+            O reserva substituiu alguém?
+        </label>
+
+        <select name="substituido" class="form-select">
+            <option value="">Não, foi adubação</option>
+
+            {% for tit in titulares %}
+            <option value="{{ tit.id }}">
+                {{ tit.usuario.username }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <button class="btn btn-danger">
+        Confirmar Acionamento
+    </button>
+
+    <a href="{% url 'escalas:detalhe_escala' escala.id %}"
+       class="btn btn-secondary ms-2">
+        Cancelar
+    </a>
+</form>
+{% endblock %}

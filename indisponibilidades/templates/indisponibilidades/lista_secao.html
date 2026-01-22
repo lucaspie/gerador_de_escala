@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Indisponibilidades da Seção{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="mb-3">🚫 Indisponibilidades da Seção</h3>
+
+  {% if indisponibilidades %}
+  <table class="table table-bordered table-hover">
+    <thead class="table-light">
+      <tr>
+        <th>Operador</th>
+        <th>Início</th>
+        <th>Fim</th>
+        <th>Motivo</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in indisponibilidades %}
+      <tr>
+        <td>{{ i.usuario.get_full_name|default:i.usuario.username }}</td>
+        <td>{{ i.data_inicio|date:"d/m/Y" }}</td>
+        <td>{{ i.data_fim|date:"d/m/Y" }}</td>
+        <td>{{ i.motivo|default:"—" }}</td>
+        <td>
+          {% if i.aprovada %}
+            <span class="badge bg-success">Aprovada</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pendente</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="alert alert-info">
+      Nenhuma indisponibilidade cadastrada na seção.
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

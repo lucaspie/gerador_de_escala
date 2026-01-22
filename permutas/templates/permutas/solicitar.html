@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Solicitar Permuta{% endblock %}
+
+{% block content %}
+<h4>Solicitar Permuta</h4>
+
+<p>
+  <strong>Sua escala:</strong>
+  {{ alocacao_origem.turno.dia.data }}
+  — {{ alocacao_origem.turno.get_turno_display }}
+</p>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="mb-3">
+    <label class="form-label">Trocar com:</label>
+    <select name="alocacao_destino" class="form-select">
+      {% for aloc in possiveis_trocas %}
+        <option value="{{ aloc.id }}">
+          {{ aloc.usuario.first_name }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button class="btn btn-success">
+    Enviar Solicitação
+  </button>
+  <a href="{% url 'accounts:minhas_escalas' %}" class="btn btn-secondary">
+    Cancelar
+  </a>
+</form>
+{% endblock %}

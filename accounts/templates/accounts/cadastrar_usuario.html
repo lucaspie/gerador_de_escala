@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>➕ Cadastrar Usuário</h2>
+
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <button type="submit" class="btn btn-primary">
+        Criar usuário
+    </button>
+</form>
+
+<p class="mt-3 text-muted">
+    🔑 A senha inicial será <strong>SenhaPadrao</strong>
+</p>
+
+{% endblock %}

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="alert alert-primary">
+      {{ mensagem }}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  {% if user.pode_escalar %}
+  <a href="{% url 'escalas:criar_escala' %}" class="btn btn-primary mb-2">
+    Criar Nova Escala
+  </a>
+
+  <a href="{% url 'escalas:lista_escalas' %}" class="btn btn-outline-primary mb-2">
+    Minhas Escalas
+  </a>
+
+  <a href="{% url 'escalas:semanas_escalante' %}" class="btn btn-outline-primary">
+    Semanas de Escala
+  </a>
+  {% endif %}
+
+  {% if user.papel == "OPE" %}
+  <!-- OPERADOR -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">📅 Minhas Escalas</h5>
+        <p class="card-text">
+          Consulte suas escalas passadas e futuras.
+        </p>
+        <a href="{% url 'escalas:minhas_escalas' %}" class="btn btn-success w-100">
+          Acessar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">🔄 Permutas</h5>
+        <p class="card-text">
+          Solicite ou aceite trocas de turno.
+        </p>
+        <a href="{% url 'permutas:minhas_permutas' %}" class="btn btn-outline-primary w-100">
+          Ver Permutas
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">📊 Relatórios</h5>
+        <p class="card-text">
+          Visualize escalas, pontuação e histórico.
+        </p>
+        <a href="{% url 'pontuacao:minha_pontuacao' %}" class="btn btn-outline-secondary w-100">
+          Em breve
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">⚠️ Inidsponibiliades</h5>
+        <p class="card-text">
+          Visualize suas indisponibiliades.
+        </p>
+        <a href="{% url 'indisponibilidades:minhas' %}" class="btn btn-outline-primary w-100 mb-2">
+          📋 Minhas Indisponibilidades
+        </a>
+
+        <a href="{% url 'indisponibilidades:nova' %}" class="btn btn-outline-success w-100">
+          ➕ Nova Indisponibilidade
+        </a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <!-- ESCALANTE / ENCARREGADO -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">🗓 Criar Escala</h5>
+        <p class="card-text">
+          Gere a escala semanal da sua seção.
+        </p>
+        <a href="{% url 'escalas:criar_escala' %}" class="btn btn-primary w-100">
+          Criar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">🗓 Criar Sobreaviso</h5>
+        <p class="card-text">
+          Gere o sobreaviso.
+        </p>
+        <a href="{% url 'escalas:criar_sobreaviso' %}" class="btn btn-warning w-100">
+          Criar
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">🗓 Pedidos de permuta</h5>
+        <p class="card-text">
+          Pedidos de permutas da seção
+        </p>
+        <a href="{% url 'permutas:pedidos' %}" class="btn btn-danger">
+          📋 Pedidos de Permuta
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">👥 Usuários</h5>
+        <p class="card-text">
+          Lista de usuários
+        </p>
+        <a href="{% url 'accounts:lista_usuarios' %}" class="btn btn-success">
+          Lista de usuários
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">📊 Relatórios</h5>
+        <p class="card-text">
+          Visualize escalas, pontuação e histórico.
+        </p>
+        <a href="{% url 'relatorios:pontuacao_secao' %}" class="btn btn-outline-secondary w-100">
+          Em breve
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title">⚠️ Inidsponibiliades</h5>
+        <p class="card-text">
+          Visualize suas indisponibiliades.
+        </p>
+        <a href="{% url 'indisponibilidades:secao' %}" class="btn btn-outline-danger w-100">
+          👥 Ver Indisponibilidades da Seção
+        </a>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endblock %}

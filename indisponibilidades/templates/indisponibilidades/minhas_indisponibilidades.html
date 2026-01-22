@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Minhas Indisponibilidades{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>📆 Minhas Indisponibilidades</h3>
+    <a href="{% url 'indisponibilidades:nova' %}" class="btn btn-primary">
+      + Nova indisponibilidade
+    </a>
+  </div>
+
+  {% if indisponibilidades %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Início</th>
+        <th>Fim</th>
+        <th>Motivo</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in indisponibilidades %}
+      <tr>
+        <td>{{ i.data_inicio|date:"d/m/Y" }}</td>
+        <td>{{ i.data_fim|date:"d/m/Y" }}</td>
+        <td>{{ i.motivo|default:"—" }}</td>
+        <td>
+          {% if i.aprovada %}
+            <span class="badge bg-success">Aprovada</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pendente</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <div class="alert alert-info">
+      Você não possui indisponibilidades cadastradas.
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

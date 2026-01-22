@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-4">
+    <div class="card shadow">
+      <div class="card-header bg-dark text-white text-center">
+        Sistema de Escalas
+      </div>
+      <div class="card-body">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-danger">
+          {{ message }}
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Usuário</label>
+            <input type="text" name="username" class="form-control" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Senha</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+
+          {% if form.errors %}
+          <div class="alert alert-danger">
+            Usuário ou senha inválidos.
+          </div>
+          {% endif %}
+
+          <button class="btn btn-primary w-100">
+            Entrar
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

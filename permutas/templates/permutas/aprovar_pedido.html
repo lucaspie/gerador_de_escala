@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Aprovar Permuta{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+  <h4>✅ Aprovar Pedido de Permuta</h4>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <p>
+        <strong>Solicitante:</strong> {{ permuta.solicitante.username }}
+      </p>
+      <p>
+        <strong>Data:</strong>
+        {{ permuta.alocacao_origem.turno.dia.data|date:"d/m/Y" }}
+      </p>
+      <p>
+        <strong>Turno:</strong>
+        {{ permuta.alocacao_origem.turno.get_turno_display }}
+      </p>
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label">Novo operador</label>
+          <select name="usuario" class="form-select" required>
+            <option value="">---</option>
+            {% for u in usuarios %}
+              <option value="{{ u.id }}">
+                {{ u.username }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <button class="btn btn-success">
+          Confirmar
+        </button>
+        <a href="{% url 'permutas:pedidos' %}" class="btn btn-secondary">
+          Cancelar
+        </a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
