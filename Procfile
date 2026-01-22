@@ -1,0 +1,1 @@
+web: gunicorn gerador_de_escala.wsgi
