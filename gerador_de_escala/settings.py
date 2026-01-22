@@ -89,13 +89,26 @@ WSGI_APPLICATION = 'gerador_de_escala.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+db_url = os.getenv("DATABASE_PUBLIC_URL") or os.getenv("DATABASE_URL")
 
 DATABASES = {
-    "default": dj_database_url.parse(
-        os.getenv("DATABASE_URL"),
+    "default": dj_database_url.config(
+        default=db_url,
         conn_max_age=600,
+        ssl_require=True,
     )
 }
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.railway.app",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://web-production-361f.up.railway.app",
+]
+
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 
 # Password validation
