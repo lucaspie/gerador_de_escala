@@ -1,1 +1,1 @@
-web: gunicorn gerador_de_escala.wsgi
+web: gunicorn gerador_de_escala.wsgi:application --bind 0.0.0.0:$PORT
