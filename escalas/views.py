@@ -7,10 +7,12 @@ from .models import Escala
 from .services import gerar_escala_semanal, encerrar_escala, acionar_sobreaviso, criar_sobreaviso_service
 from .forms import CriarEscalaForm
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from .models import TurnoEscala, AlocacaoEscala, DiaEscala, User
-from django.utils.timezone import now
 from django.db.models import Prefetch
+from django.core.paginator import Paginator
+User = get_user_model()
 
 @login_required
 def criar_escala(request):
@@ -152,9 +154,15 @@ def lista_escalas(request):
     if not request.user.pode_escalar():
         raise PermissionDenied
 
-    escalas = Escala.objects.filter(
-        secao=request.user.secao
-    ).order_by("-data_inicio")
+    escalas_qs = (
+        Escala.objects
+        .filter(secao=request.user.secao)
+        .order_by("-data_inicio")
+    )
+
+    paginator = Paginator(escalas_qs, 10)  # 10 por página
+    page_number = request.GET.get("page")
+    escalas = paginator.get_page(page_number)
 
     return render(
         request,

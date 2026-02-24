@@ -1,16 +1,14 @@
 from datetime import timedelta
 from django.db import transaction
 from .models import Escala, DiaEscala, TurnoEscala, AlocacaoEscala
-from .utils import SeletorOperadores, pode_assumir_turno
+from .utils import SeletorOperadores, puxar_da_fila, fila_operadores, pontuar_alocacao
 from django.db import transaction
-from django.utils.timezone import now
 from accounts.models import User
-from django.db.models import Sum, Q, Count
+from django.db.models import Q, Count
+from django.db.models import Prefetch
 
 from pontuacao.utils import registrar_pontuacao
-from .models import Escala
 from django.core.exceptions import ValidationError
-from django.db.models import Sum
 
 def acionar_sobreaviso(alocacao):
     """
@@ -45,25 +43,23 @@ def gerar_escala_semanal(
         criada_por=criada_por,
     )
 
-    colaboradores = (
-        User.objects
-        .filter(secao=secao, papel="OPE")
-        .annotate(total_pontos=Sum("pontuacoes__pontos"))
-        .order_by("total_pontos", "id")
-    )
+    fila = fila_operadores(secao)
 
-    seletor = SeletorOperadores(list(colaboradores))
+    amarelos = []
+    pretos = []
 
+    # =========================
+    # 1️⃣ Criar estrutura
+    # =========================
     for i in range(7):
         data = data_inicio + timedelta(days=i)
         weekday = data.weekday()
 
-        if weekday < 4:
-            tipo_dia = "PRETA"
-        elif weekday == 4:
-            tipo_dia = "AMARELA"
-        else:
-            tipo_dia = "VERMELHA"
+        tipo_dia = (
+            "PRETA" if weekday < 4
+            else "AMARELA" if weekday == 4
+            else "VERMELHA"
+        )
 
         dia = DiaEscala.objects.create(
             escala=escala,
@@ -74,72 +70,97 @@ def gerar_escala_semanal(
         if tipo_dia == "VERMELHA":
             continue
 
-        usados_no_dia = set()
-
         for turno_codigo in TURNOS_PADRAO:
             turno = TurnoEscala.objects.create(
                 dia=dia,
                 turno=turno_codigo,
             )
 
-            qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
+            registro = (data, turno_codigo, turno)
 
-            # 🔹 TITULARES
-            for _ in range(qtd):
-                usuario = None
+            if tipo_dia == "AMARELA":
+                amarelos.append(registro)
+            else:
+                pretos.append(registro)
 
-                for _ in range(len(seletor.operadores)):
-                    candidato = seletor.proximo(data, usados_no_dia)
-                    if not candidato:
-                        break
+    # =========================
+    # 2️⃣ TITULARES AMARELA
+    # =========================
+    for data, turno_codigo, turno in amarelos:
+        usados_no_dia = set()
 
-                    if pode_assumir_turno(candidato, turno_codigo):
-                        usuario = candidato
-                        break
+        qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
 
-                if not usuario:
-                    break
+        for _ in range(qtd):
+            op = puxar_da_fila(fila, data, turno_codigo, usados_no_dia)
+            if not op:
+                break
 
-                AlocacaoEscala.objects.create(
-                    turno=turno,
-                    usuario=usuario,
-                    tipo="TIT",
-                )
-                usados_no_dia.add(usuario.id)
+            aloc = AlocacaoEscala.objects.create(
+                turno=turno,
+                usuario=op,
+                tipo="TIT",
+            )
+            usados_no_dia.add(op.id)
+            pontuar_alocacao(aloc)
 
-            # 🔹 RESERVA
-            usuario = None
+    # =========================
+    # 3️⃣ TITULARES PRETA
+    # =========================
+    for data, turno_codigo, turno in pretos:
+        usados_no_dia = set()
 
-            for _ in range(len(seletor.operadores)):
-                candidato = seletor.proximo(data, usados_no_dia)
-                if not candidato:
-                    break
+        qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
 
-                if pode_assumir_turno(candidato, turno_codigo):
-                    usuario = candidato
-                    break
+        for _ in range(qtd):
+            op = puxar_da_fila(fila, data, turno_codigo, usados_no_dia)
+            if not op:
+                break
 
-            if usuario:
-                AlocacaoEscala.objects.create(
-                    turno=turno,
-                    usuario=usuario,
-                    tipo="RES",
-                )
-                usados_no_dia.add(usuario.id)
+            aloc = AlocacaoEscala.objects.create(
+                turno=turno,
+                usuario=op,
+                tipo="TIT",
+            )
+            usados_no_dia.add(op.id)
+            pontuar_alocacao(aloc)
+
+    # =========================
+    # 4️⃣ RESERVAS (TUDO)
+    # =========================
+    todos = amarelos + pretos
+
+    for data, turno_codigo, turno in todos:
+        usados_no_dia = set(
+            AlocacaoEscala.objects.filter(
+                turno__dia__data=data
+            ).values_list("usuario_id", flat=True)
+        )
+
+        op = puxar_da_fila(fila, data, turno_codigo, usados_no_dia)
+
+        if op:
+            AlocacaoEscala.objects.create(
+                turno=turno,
+                usuario=op,
+                tipo="RES",
+            )
 
     return escala
-
-
 
 @transaction.atomic
 def encerrar_escala(escala, usuario):
     if escala.status != Escala.Status.PUBLICADA:
-        raise ValueError("A escala precisa estar publicada para ser encerrada.")
+        raise ValueError("A escala precisa estar publicada.")
 
     if not usuario.pode_escalar():
-        raise PermissionError("Usuário sem permissão.")
+        raise PermissionError("Sem permissão.")
 
-    for dia in escala.dias.all():
+    dias = escala.dias.prefetch_related(
+        Prefetch("turnos__alocacoes")
+    )
+
+    for dia in dias:
         for turno in dia.turnos.all():
             for alocacao in turno.alocacoes.all():
                 registrar_pontuacao(alocacao)

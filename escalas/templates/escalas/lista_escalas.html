@@ -69,6 +69,49 @@
         {% endfor %}
     </tbody>
 </table>
+{% if escalas.has_other_pages %}
+<nav class="mt-4">
+  <ul class="pagination justify-content-center">
+
+    {% if escalas.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ escalas.previous_page_number }}">
+          Anterior
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">Anterior</span>
+      </li>
+    {% endif %}
+
+    {% for num in escalas.paginator.page_range %}
+      {% if escalas.number == num %}
+        <li class="page-item active">
+          <span class="page-link">{{ num }}</span>
+        </li>
+      {% elif num >= escalas.number|add:-2 and num <= escalas.number|add:2 %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+      {% endif %}
+    {% endfor %}
+
+    {% if escalas.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ escalas.next_page_number }}">
+          Próxima
+        </a>
+      </li>
+    {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">Próxima</span>
+      </li>
+    {% endif %}
+
+  </ul>
+</nav>
+{% endif %}
 {% else %}
 <div class="alert alert-info">
     Nenhuma escala criada ainda.

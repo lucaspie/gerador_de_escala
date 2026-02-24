@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3>Lançar Pontos</h3>
+
+<p>
+  <strong>Militar:</strong> {{ alocacao.usuario.get_full_name }} <br>
+  <strong>Data:</strong> {{ alocacao.turno.dia.data }} <br>
+  <strong>Turno:</strong> {{ alocacao.turno.get_turno_display }}
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="mb-3">
+    <label>Pontos</label>
+    <input type="number" name="pontos" class="form-control" required>
+  </div>
+
+  <button class="btn btn-success">Salvar</button>
+</form>
+{% endblock %}

@@ -3,6 +3,8 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
 from datetime import date, timedelta
 from django.db.models import Sum, Count, Q
+from .exports import exportar_pontuacao_pdf
+from datetime import datetime
 
 from .services import pontuacao_por_secao
 from .exports import exportar_pontuacao_excel
@@ -27,7 +29,10 @@ def relatorio_pontuacao_secao(request):
     )
 
     labels = [d["usuario__username"] for d in dados]
-    valores = [float(d["total"]) for d in dados]
+    valores_total = [float(d["total"] or 0) for d in dados]
+    valores_preta = [float(d["preta"] or 0) for d in dados]
+    valores_amarela = [float(d["amarela"] or 0) for d in dados]
+    valores_vermelha = [float(d["vermelha"] or 0) for d in dados]
 
     # ===============================
     # 2️⃣ SOBREAVISO (DIAS VERMELHOS)
@@ -69,42 +74,47 @@ def relatorio_pontuacao_secao(request):
     )
 
     return render(
-        request,
-        "relatorios/pontuacao_secao.html",
+    request,
+    "relatorios/pontuacao_secao.html",
         {
             "dados": dados,
             "labels": labels,
-            "valores": valores,
-            "sobreavisos": sobreavisos,  # 👈 NOVO
+            "valores_total": valores_total,
+            "valores_preta": valores_preta,
+            "valores_amarela": valores_amarela,
+            "valores_vermelha": valores_vermelha,
+            "sobreavisos": sobreavisos,
             "data_inicio": data_inicio,
             "data_fim": data_fim,
         },
     )
+
+def parse_data(valor):
+    if not valor or valor == "None":
+        return None
+    return datetime.strptime(valor, "%Y-%m-%d").date()
 
 @login_required
 def exportar_excel(request):
     if not request.user.pode_escalar():
         raise PermissionDenied
 
-    data_inicio = request.GET.get("data_inicio")
-    data_fim = request.GET.get("data_fim")
+    data_inicio = parse_data(request.GET.get("data_inicio"))
+    data_fim = parse_data(request.GET.get("data_fim"))
 
     return exportar_pontuacao_excel(
         secao=request.user.secao,
         data_inicio=data_inicio,
         data_fim=data_fim,
     )
-
-from .exports import exportar_pontuacao_pdf
-
-
+    
 @login_required
 def exportar_pdf(request):
     if not request.user.pode_escalar():
         raise PermissionDenied
-
-    data_inicio = request.GET.get("data_inicio")
-    data_fim = request.GET.get("data_fim")
+    
+    data_inicio = parse_data(request.GET.get("data_inicio"))
+    data_fim = parse_data(request.GET.get("data_fim"))
 
     return exportar_pontuacao_pdf(
         secao=request.user.secao,
@@ -124,8 +134,8 @@ def dashboard(request):
             Indisponibilidade.objects
             .filter(
                 usuario__secao=request.user.secao,
-                data_fim__gte=hoje,
-                data_inicio__lte=limite,
+                data_fim__gte=limite,
+                data_inicio__lte=hoje,
             )
             .select_related("usuario")
             .order_by("data_inicio")

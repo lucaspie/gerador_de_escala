@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Pontuar Operador{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>🎖 {{ operador.get_full_name }}</h3>
+    <a href="{% url 'pontuacao:painel' %}" class="btn btn-outline-secondary">
+      ← Voltar
+    </a>
+  </div>
+
+  <form method="post" class="card p-3 shadow-sm mb-4">
+  {% csrf_token %}
+  <div class="row g-2">
+
+    <div class="col-md-3">
+      <select name="tipo" class="form-select" required>
+        <option value="">Tipo</option>
+        <option value="PRETA">Preta</option>
+        <option value="AMARELA">Amarela</option>
+        <option value="VERMELHA">Vermelha</option>
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <input type="number" name="pontos"
+             class="form-control"
+             placeholder="Pts"
+             required>
+    </div>
+
+    <div class="col-md-4">
+      <input type="text" name="observacao"
+             class="form-control"
+             placeholder="Observação (opcional)">
+    </div>
+
+    <div class="col-md-3">
+      <button class="btn btn-success w-100">
+        ➕ Lançar
+      </button>
+    </div>
+
+  </div>
+</form>
+
+  <h5>📜 Histórico</h5>
+  <table class="table table-sm table-bordered">
+    <thead class="table-dark">
+      <tr>
+        <th>Data</th>
+        <th>Pontos</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in historico %}
+      <tr>
+        <td>{{ p.criado_em|date:"d/m/Y H:i" }}</td>
+        <td>{{ p.pontos }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="2" class="text-center">Sem registros</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</div>
+{% endblock %}
