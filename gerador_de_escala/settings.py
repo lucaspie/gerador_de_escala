@@ -135,6 +135,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 AXES_FAILURE_LIMIT = 5          # 5 tentativas erradas
+AXES_COOLOFF_TIME = 0.05           # 1 hora de bloqueio
 AXES_LOCKOUT_CALLABLE = None
 AXES_RESET_ON_SUCCESS = True
 AXES_ENABLE_ADMIN = True
