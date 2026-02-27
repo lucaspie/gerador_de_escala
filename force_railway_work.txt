@@ -1,0 +1,1 @@
+Do not copy the old image, pick up the last version in git hub
