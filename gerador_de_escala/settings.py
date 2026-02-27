@@ -32,7 +32,8 @@ if not SECRET_KEY:
 DEBUG = os.getenv("DEBUG")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
-
+if not ALLOWED_HOSTS or ALLOWED_HOSTS == [""]:
+    ALLOWED_HOSTS = ["*.railway.app"]
 
 # Application definition
 
@@ -95,15 +96,12 @@ DATABASES = {
     "default": dj_database_url.config(
         default=db_url,
         conn_max_age=600,
-        #ssl_require=True,
+        ssl_require=True,
     )
 }
 
 CSRF_TRUSTED_ORIGINS = [
     "https://*.railway.app",
-]
-
-CSRF_TRUSTED_ORIGINS = [
     "https://web-production-361f.up.railway.app",
 ]
 
