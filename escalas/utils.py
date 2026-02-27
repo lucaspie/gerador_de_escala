@@ -1,13 +1,11 @@
 from indisponibilidades.models import Indisponibilidade
-from django.db.models.functions import Coalesce
 from django.db.models import Sum, Q, Value, Count
 from accounts.models import User
 from collections import defaultdict
-from django.db.models import Sum, Value
-from django.db.models.functions import Coalesce
 from collections import deque
 from pontuacao.models import Pontuacao
 from django.db.models import F, ExpressionWrapper, FloatField
+from accounts.models import Curso
 
 def pontuar_alocacao(alocacao):
     tipo_dia = alocacao.turno.dia.tipo_dia
@@ -119,22 +117,67 @@ def fila_operadores(secao):
     return deque(operadores)
 
 
-def puxar_da_fila(fila, data, turno_codigo, usados_no_dia):
+def puxar_da_fila(fila, data, turno, usados_no_dia):
+    """
+    Lógica inteligente:
+    - NOT: garante pelo menos 1 habilitado
+    - MAD: validação normal
+    """
+
     tamanho = len(fila)
+
+    # verifica se já há habilitado no NOT
+    ja_tem_habilitado = False
+    if turno.turno == "NOT":
+        ja_tem_habilitado = turno.alocacoes.filter(
+            usuario__cursos__codigo="MAN",
+        ).exists()
+
+    candidato_habilitado = None
 
     for _ in range(tamanho):
         op = fila.popleft()
 
-        valido = (
+        disponivel = (
             op.id not in usados_no_dia
             and usuario_disponivel(op, data)
-            and pode_assumir_turno(op, turno_codigo)
         )
+
+        if not disponivel:
+            fila.append(op)
+            continue
+
+        # ===============================
+        # NOTURNO – regra especial
+        # ===============================
+        if turno.turno == "NOT":
+
+            # se já tem habilitado → qualquer um pode entrar
+            if ja_tem_habilitado:
+                fila.append(op)
+                return op
+
+            # ainda não tem habilitado → guardar o primeiro habilitado encontrado
+            if op.cursos.filter(codigo=Curso.MANUTENCAO).exists():
+                candidato_habilitado = op
+
+            fila.append(op)
+            continue
+
+        # ===============================
+        # MADRUGADA (regra normal)
+        # ===============================
+        if turno.turno == "MAD":
+            if pode_assumir_turno(op, "MAD"):
+                fila.append(op)
+                return op
 
         fila.append(op)
 
-        if valido:
-            return op
+    # Se for NOT e ainda não tem habilitado,
+    # retorna o habilitado encontrado (se houver)
+    if turno.turno == "NOT" and not ja_tem_habilitado:
+        return candidato_habilitado
 
     return None
     

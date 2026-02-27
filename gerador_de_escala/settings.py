@@ -95,7 +95,7 @@ DATABASES = {
     "default": dj_database_url.config(
         default=db_url,
         conn_max_age=600,
-        ssl_require=True,
+        #ssl_require=True,
     )
 }
 
@@ -155,6 +155,11 @@ USE_I18N = True
 
 USE_TZ = True
 
+ESCALA_IA_PARAMS = {
+    "peso_pontos": 1.0033665570804864,
+    "peso_amarelas": 1.54719569303398,
+    "peso_sobreaviso": 0.6320978796260854,
+}
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/

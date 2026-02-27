@@ -7,6 +7,7 @@ from .exports import exportar_pontuacao_pdf
 from datetime import datetime
 
 from .services import pontuacao_por_secao
+from .services import dias_por_secao
 from .exports import exportar_pontuacao_excel
 from indisponibilidades.models import Indisponibilidade
 from escalas.models import AlocacaoEscala

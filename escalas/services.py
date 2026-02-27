@@ -6,9 +6,19 @@ from django.db import transaction
 from accounts.models import User
 from django.db.models import Q, Count
 from django.db.models import Prefetch
+from escalas.ia.runtime import fila_operadores_com_ia
+from .fairness import puxar_da_fila_fair
+from collections import deque
 
 from pontuacao.utils import registrar_pontuacao
 from django.core.exceptions import ValidationError
+
+def ja_escalado_no_dia(usuario_id, data, escala):
+    return AlocacaoEscala.objects.filter(
+        usuario_id=usuario_id,
+        turno__dia__data=data,
+        turno__dia__escala=escala,
+    ).exists()
 
 def acionar_sobreaviso(alocacao):
     """
@@ -28,6 +38,8 @@ def acionar_sobreaviso(alocacao):
 
 TURNOS_PADRAO = ["MAD", "NOT"]
 
+from django.db import transaction
+
 @transaction.atomic
 def gerar_escala_semanal(
     secao,
@@ -43,7 +55,7 @@ def gerar_escala_semanal(
         criada_por=criada_por,
     )
 
-    fila = fila_operadores(secao)
+    fila_base = fila_operadores(secao)
 
     amarelos = []
     pretos = []
@@ -84,67 +96,86 @@ def gerar_escala_semanal(
                 pretos.append(registro)
 
     # =========================
-    # 2️⃣ TITULARES AMARELA
+    # Helper justo
     # =========================
-    for data, turno_codigo, turno in amarelos:
-        usados_no_dia = set()
+    def alocar_bloco(lista, fila, secao):
+        usados_por_dia = {}
 
-        qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
+        for data, turno_codigo, turno in lista:
+            usados_no_dia = usados_por_dia.setdefault(data, set())
+            qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
 
-        for _ in range(qtd):
-            op = puxar_da_fila(fila, data, turno_codigo, usados_no_dia)
-            if not op:
-                break
+            for _ in range(qtd):
+                op = puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao)
+                if not op:
+                    break
 
-            aloc = AlocacaoEscala.objects.create(
-                turno=turno,
-                usuario=op,
-                tipo="TIT",
+                usados_no_dia.add(op.id)
+
+                aloc = AlocacaoEscala.objects.create(
+                    turno=turno,
+                    usuario=op,
+                    tipo="TIT",
+                    data=data,
+                )
+                pontuar_alocacao(aloc)
+
+        return usados_por_dia
+
+    # =========================
+    # 2️⃣ AMARELOS (fila isolada)
+    # =========================
+    fila_amarela = deque(fila_base)
+    usados_amarelos = alocar_bloco(amarelos, fila_amarela, secao)
+
+    # =========================
+    # 3️⃣ PRETOS (fila continua)
+    # =========================
+    # começa de onde amarelo terminou → justiça semanal
+    fila_preta = fila_amarela
+    usados_pretos = alocar_bloco(pretos, fila_preta, secao)
+
+    # =========================
+    # VALIDAR NOT habilitado
+    # =========================
+    for data, turno_codigo, turno in amarelos + pretos:
+        if turno_codigo != "NOT":
+            continue
+
+        tem_habilitado = turno.alocacoes.filter(
+            usuario__cursos__codigo="MAN",
+            tipo="TIT"
+        ).exists()
+
+        if not tem_habilitado:
+            raise ValidationError(
+                f"Turno noturno do dia {data} ficou sem habilitado."
             )
-            usados_no_dia.add(op.id)
-            pontuar_alocacao(aloc)
 
     # =========================
-    # 3️⃣ TITULARES PRETA
+    # RESERVAS (justas)
     # =========================
-    for data, turno_codigo, turno in pretos:
-        usados_no_dia = set()
+    usados_global = {}
 
-        qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
+    for dicionario in (usados_amarelos, usados_pretos):
+        for data, usados in dicionario.items():
+            usados_global.setdefault(data, set()).update(usados)
 
-        for _ in range(qtd):
-            op = puxar_da_fila(fila, data, turno_codigo, usados_no_dia)
-            if not op:
-                break
+    for data, turno_codigo, turno in amarelos + pretos:
+        usados_no_dia = usados_global.setdefault(data, set())
 
-            aloc = AlocacaoEscala.objects.create(
-                turno=turno,
-                usuario=op,
-                tipo="TIT",
-            )
-            usados_no_dia.add(op.id)
-            pontuar_alocacao(aloc)
+        op = puxar_da_fila_fair(fila_preta, data, turno, usados_no_dia, secao)
+        if not op:
+            continue
 
-    # =========================
-    # 4️⃣ RESERVAS (TUDO)
-    # =========================
-    todos = amarelos + pretos
+        usados_no_dia.add(op.id)
 
-    for data, turno_codigo, turno in todos:
-        usados_no_dia = set(
-            AlocacaoEscala.objects.filter(
-                turno__dia__data=data
-            ).values_list("usuario_id", flat=True)
+        AlocacaoEscala.objects.create(
+            turno=turno,
+            usuario=op,
+            tipo="RES",
+            data=data,
         )
-
-        op = puxar_da_fila(fila, data, turno_codigo, usados_no_dia)
-
-        if op:
-            AlocacaoEscala.objects.create(
-                turno=turno,
-                usuario=op,
-                tipo="RES",
-            )
 
     return escala
 
@@ -207,15 +238,10 @@ def criar_sobreaviso_service(secao, data, quantidade, criada_por):
     for _ in range(quantidade):
         usuario = None
 
-        # 🔁 tenta vários candidatos
         for _ in range(len(operadores)):
             candidato = seletor.proximo(data, usados)
             if not candidato:
                 break
-
-            # futuramente: regra específica
-            # if not pode_assumir_sobreaviso(candidato):
-            #     continue
 
             usuario = candidato
             break
@@ -228,9 +254,9 @@ def criar_sobreaviso_service(secao, data, quantidade, criada_por):
             usuario=usuario,
             tipo="SOB",
             foi_acionado=False,
+            data=data,  # 🔥 OBRIGATÓRIO AGORA
         )
 
         usados.add(usuario.id)
 
     return escala
-

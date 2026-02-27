@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.db.models import Q, UniqueConstraint
+from django.core.exceptions import ValidationError
 from .utils import pode_assumir_turno
 
 User = settings.AUTH_USER_MODEL
@@ -119,17 +120,20 @@ class AlocacaoEscala(models.Model):
         SOBREAVISO = "SOB", "Sobreaviso"
 
     turno = models.ForeignKey(
-        TurnoEscala,
+        "TurnoEscala",
         on_delete=models.CASCADE,
         related_name="alocacoes",
     )
+
+    # 🔥 CAMPO NOVO (obrigatório)
+    data = models.DateField(db_index=True, null=True, blank=True)
 
     usuario = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
         related_name="alocacoes",
-        null=True,     
-        blank=True,    
+        null=True,
+        blank=True,
     )
 
     tipo = models.CharField(
@@ -149,17 +153,25 @@ class AlocacaoEscala(models.Model):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="substituido_por"
+        related_name="substituido_por",
     )
 
     class Meta:
         constraints = [
-            # Um usuário não pode se repetir no mesmo turno
+            # 🚨 REGRA PRINCIPAL
+            # usuário só pode aparecer uma vez por dia
+            UniqueConstraint(
+                fields=["usuario", "data"],
+                name="usuario_unico_por_dia",
+            ),
+
+            # já existia (mantido)
             UniqueConstraint(
                 fields=["turno", "usuario"],
                 name="usuario_unico_por_turno",
             ),
-            # Apenas UM reserva por turno
+
+            # um reserva por turno
             UniqueConstraint(
                 fields=["turno"],
                 condition=Q(tipo="RES"),
@@ -167,20 +179,44 @@ class AlocacaoEscala(models.Model):
             ),
         ]
 
-    def clean(self):
-        if self.usuario.papel == "ENC":
-            raise ValueError("Encarregado não pode ser escalado.")
+        indexes = [
+            models.Index(fields=["data", "usuario"]),
+        ]
 
     def __str__(self):
         return f"{self.usuario} - {self.get_tipo_display()}"
-    
+
     def clean(self):
-        if self.usuario and self.turno.turno in ["MAD", "NOT"]:
-            if not pode_assumir_turno(self.usuario, self.turno.turno):
-                raise ValueError(
-                    f"{self.usuario} não possui curso necessário para "
-                    f"{self.turno.get_turno_display()}."
+        from .utils import pode_assumir_turno
+
+        if not self.usuario:
+            return
+
+        # 🚫 Encarregado nunca pode
+        if self.usuario.papel == "ENC":
+            raise ValidationError("Encarregado não pode ser escalado.")
+
+        # 🔥 Regra especial NOTURNO
+        if self.turno.turno == "NOT":
+
+            # verifica se já existe habilitado no turno
+            ja_tem_habilitado = self.turno.alocacoes.filter(
+                usuario__tem_curso_manutencao=True
+            ).exclude(id=self.id).exists()
+
+            # se já tem um habilitado → qualquer um pode entrar
+            if ja_tem_habilitado:
+                return
+
+            # se ainda não tem → este precisa ser habilitado
+            if not self.usuario.tem_curso_manutencao:
+                raise ValidationError(
+                    "Turno noturno precisa ter pelo menos um operador com curso."
                 )
 
-        if self.usuario and self.usuario.papel == "ENC":
-            raise ValueError("Encarregado não pode ser escalado.")
+        # MADRUGADA continua validação normal se quiser
+        if self.turno.turno == "MAD":
+            if not pode_assumir_turno(self.usuario, "MAD"):
+                raise ValidationError(
+                    "Usuário não possui curso necessário para Madrugada."
+                )
