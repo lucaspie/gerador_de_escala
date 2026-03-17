@@ -26,43 +26,49 @@
 <body class="bg-light">
   {% if user.is_authenticated %}
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="/">Home</a>
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">Home</a>
 
-      <div class="collapse navbar-collapse">
-        <ul class="navbar-nav me-auto">
-          {% if user.is_authenticated %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'accounts:minhas_escalas' %}">
-              Minhas Escalas
-            </a>
-          </li>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
 
-          {% if user.pode_escalar %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'escalas:criar_escala' %}">
-              Criar Escala
-            </a>
-          </li>
-          {% endif %}
-          {% endif %}
-        </ul>
-
+    <div class="collapse navbar-collapse" id="navbarMain">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         {% if user.is_authenticated %}
-        <span class="navbar-text text-white me-3">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'accounts:minhas_escalas' %}">
+            Minhas Escalas
+          </a>
+        </li>
+
+        {% if user.pode_escalar %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'escalas:criar_escala' %}">
+            Criar Escala
+          </a>
+        </li>
+        {% endif %}
+        {% endif %}
+      </ul>
+
+      <div class="d-flex align-items-center">
+        {% if user.is_authenticated %}
+        <span class="navbar-text text-white me-3 mb-2 mb-lg-0">
           {{ user.first_name }} ({{ user.get_papel_display }})
         </span>
 
         <form action="{% url 'logout' %}" method="post" class="d-inline">
           {% csrf_token %}
-          <button type="submit" class="btn btn-outline-light btn-sm">
+          <button type="submit" class="btn btn-outline-light btn-sm w-100">
             Sair
           </button>
         </form>
         {% endif %}
       </div>
     </div>
-  </nav>
+  </div>
+</nav>
   {% endif %}
 
   <div class="container">
