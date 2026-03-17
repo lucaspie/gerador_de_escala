@@ -19,6 +19,57 @@ def relatorio_pontuacao_secao(request):
 
     data_inicio = request.GET.get("data_inicio")
     data_fim = request.GET.get("data_fim")
+    hoje = date.today()
+    limite = hoje + timedelta(days=10)
+    
+    # ===============================
+    # 3️⃣ PISTEIROS
+    # ===============================
+    pisteiros = (
+        AlocacaoEscala.objects
+        .filter(
+            turno__dia__escala__secao=request.user.secao,
+            pisteiro=True,
+        )
+    )
+
+    if data_inicio:
+        pisteiros = pisteiros.filter(
+            turno__dia__data__gte=data_inicio
+            )
+
+    if data_fim:
+        pisteiros = pisteiros.filter(
+            turno__dia__data__lte=data_fim
+        )
+
+    pisteiros = (
+        pisteiros
+        .values("usuario__username")
+        .annotate(
+            total_pistas=Count("id"),
+        )
+        .order_by("-total_pistas")
+    )
+    
+    indisponibilidades = Indisponibilidade.objects.filter(
+        usuario__secao=request.user.secao  # ajuste se necessário
+    )
+    
+    # Se tiver filtro manual, usa ele
+    if data_inicio and data_fim:
+        indisponibilidades = indisponibilidades.filter(
+            data_inicio__lte=data_fim,
+            data_fim__gte=data_inicio,
+        )
+    else:
+        # Senão, mostra próximos 30 dias
+        indisponibilidades = indisponibilidades.filter(
+            data_inicio__lte=limite,
+            data_fim__gte=hoje,
+        )
+
+    indisponibilidades = indisponibilidades.select_related("usuario")
 
     # ===============================
     # 1️⃣ PONTUAÇÃO GERAL
@@ -34,6 +85,9 @@ def relatorio_pontuacao_secao(request):
     valores_preta = [float(d["preta"] or 0) for d in dados]
     valores_amarela = [float(d["amarela"] or 0) for d in dados]
     valores_vermelha = [float(d["vermelha"] or 0) for d in dados]
+    
+    labels_pisteiro = [p["usuario__username"] for p in pisteiros]
+    valores_pisteiro = [p["total_pistas"] for p in pisteiros]
 
     # ===============================
     # 2️⃣ SOBREAVISO (DIAS VERMELHOS)
@@ -84,9 +138,13 @@ def relatorio_pontuacao_secao(request):
             "valores_preta": valores_preta,
             "valores_amarela": valores_amarela,
             "valores_vermelha": valores_vermelha,
+            "labels_pisteiro": labels_pisteiro,
+            "valores_pisteiro": valores_pisteiro,
             "sobreavisos": sobreavisos,
             "data_inicio": data_inicio,
             "data_fim": data_fim,
+            "indisponibilidades": indisponibilidades,
+            "pisteiros": pisteiros,
         },
     )
 

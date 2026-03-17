@@ -124,6 +124,11 @@ class AlocacaoEscala(models.Model):
         on_delete=models.CASCADE,
         related_name="alocacoes",
     )
+    
+    pisteiro = models.BooleanField(
+    default=False,
+    help_text="Indica se o militar foi pisteiro no turno",
+    )
 
     # 🔥 CAMPO NOVO (obrigatório)
     data = models.DateField(db_index=True, null=True, blank=True)

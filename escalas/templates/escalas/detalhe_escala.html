@@ -51,15 +51,21 @@
           <li class="list-group-item d-flex justify-content-between align-items-center">
             <span>
               {{ alocacao.usuario.username }}
+              {% if alocacao.tipo == "TIT" %}
+                <a href="{% url 'escalas:toggle_pisteiro' alocacao.id %}"
+                  class="btn btn-sm {% if alocacao.pisteiro %}btn-info{% else %}btn-outline-info{% endif %}">
+                  🎯 Pisteiro
+                </a>
+              {% endif %}
               {% if turno.alocacoes.count == 0 %}
-          <li class="list-group-item text-muted">
-            Nenhum militar escalado
-          </li>
-          {% endif %}
+                <li class="list-group-item text-muted">
+                  Nenhum militar escalado
+                </li>
+              {% endif %}
 
-          {% if alocacao.tipo == "RES" %}
-          <span class="badge bg-warning text-dark ms-2">Reserva</span>
-          {% endif %}
+              {% if alocacao.tipo == "RES" %}
+                <span class="badge bg-warning text-dark ms-2">Reserva</span>
+              {% endif %}
           </span>
           {% if alocacao.tipo == "RES" and not alocacao.foi_acionado and escala.status == "PUB" %}
           <a href="{% url 'escalas:acionar_reserva' alocacao.id %}" class="btn btn-sm btn-danger ms-4">

@@ -41,7 +41,7 @@
         <div class="col-12 mb-4">
             <div class="card shadow-sm border-warning">
                 <div class="card-body">
-                    <h5 class="card-title">⚠️ Indisponibilidades (próx. 30 dias)</h5>
+                    <h5 class="card-title">⚠️ Indisponibilidades (próx. 10 dias)</h5>
                     {% if indisponibilidades %}
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mt-2 text-nowrap">
@@ -68,7 +68,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <a href="{% url 'indisponibilidade:lista_secao' %}" class="btn btn-outline-warning btn-sm w-100">Ver todas</a>
+                        <a href="{% url 'indisponibilidades:secao' %}" class="btn btn-outline-warning btn-sm w-100">Ver todas</a>
                     {% else %}
                         <p class="text-muted mt-3">Nenhuma indisponibilidade registrada.</p>
                     {% endif %}
@@ -109,7 +109,7 @@
         <table class="table table-bordered align-middle">
             <thead class="table-danger">
                 <tr>
-                    <th>Usuário</th>
+                    <th>Militar</th>
                     <th>Total</th>
                     <th>Acionado</th>
                     <th>Pontos</th>
@@ -129,10 +129,45 @@
     </div>
 
     <hr>
-
-    <h5>📈 Visualização</h5>
+    <h5>📈 Visualização das escalas</h5>
     <div style="position: relative; height:40vh; width:100%;" class="mb-5">
         <canvas id="graficoPontuacao"></canvas>
+    </div>
+    <hr>
+    <h4>🛣️ Relatório de Pisteiros</h4>
+
+    <div class="table-responsive shadow-sm rounded mb-4">
+        <table class="table table-bordered align-middle">
+            <thead class="table-warning">
+                <tr>
+                    <th>Usuário</th>
+                    <th>Total de Pistas</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in pisteiros %}
+                <tr>
+                    <td>{{ p.usuario__username }}</td>
+                    <td>
+                        <span class="badge bg-warning text-dark">
+                            {{ p.total_pistas }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="2" class="text-center text-muted">
+                        Nenhum registro de pista encontrado.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h5>📈 Gráfico de Pisteiros</h5>
+    <div style="position: relative; height:40vh; width:100%;" class="mb-5">
+        <canvas id="graficoPisteiro"></canvas>
     </div>
 </div>
 
@@ -180,6 +215,39 @@ new Chart(ctx, {
         maintainAspectRatio: false,
         scales: {
             y: { beginAtZero: true }
+        }
+    }
+});
+
+const ctxP = document.getElementById('graficoPisteiro');
+
+new Chart(ctxP, {
+    type: 'bar',
+    data: {
+        labels: {{ labels_pisteiro|safe }},
+        datasets: [
+            {
+                label: 'Total de Pistas',
+                data: {{ valores_pisteiro|safe }},
+                backgroundColor: 'rgba(14, 13, 13, 0.7)',  // amarelo
+                borderColor: 'rgb(26, 25, 24)',
+                borderWidth: 1
+            }
+        ],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: true }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    precision: 0  // evita números quebrados
+                }
+            }
         }
     }
 });

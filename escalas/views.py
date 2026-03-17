@@ -420,3 +420,37 @@ def acionar_reserva(request, alocacao_id):
             "escala": escala,
         },
     )
+    
+@login_required
+def toggle_pisteiro(request, alocacao_id):
+    alocacao = get_object_or_404(AlocacaoEscala, id=alocacao_id)
+
+    escala = alocacao.turno.dia.escala
+
+    if escala.secao != request.user.secao:
+        raise PermissionDenied
+
+    if not request.user.pode_escalar():
+        raise PermissionDenied
+
+    if escala.status == Escala.Status.ENCERRADA:
+        messages.error(request, "Só pode alterar pisteiro em rascunho ou publicada.")
+        return redirect("escalas:detalhe_escala", escala.id)
+
+    # Só titular pode ser pisteiro
+    if alocacao.tipo != "TIT":
+        messages.error(request, "Apenas titulares podem ser pisteiro.")
+        return redirect("escalas:detalhe_escala", escala.id)
+
+    # Toggle
+    alocacao.pisteiro = not alocacao.pisteiro
+    alocacao.save()
+
+    messages.success(
+        request,
+        f"{alocacao.usuario.username} agora é pisteiro."
+        if alocacao.pisteiro else
+        f"{alocacao.usuario.username} não é mais pisteiro."
+    )
+
+    return redirect("escalas:detalhe_escala", escala.id)
