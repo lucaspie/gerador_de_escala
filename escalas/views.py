@@ -22,15 +22,20 @@ def criar_escala(request):
     if request.method == "POST":
         form = CriarEscalaForm(request.POST)
         if form.is_valid():
+
+            tipo = form.cleaned_data["tipo_escala"]
+
             escala = gerar_escala_semanal(
                 secao=request.user.secao,
                 data_inicio=form.cleaned_data["data_inicio"],
                 criada_por=request.user,
-                # ↓ ainda não usamos, mas já preparamos
                 qtd_madrugada=form.cleaned_data["qtd_madrugada"],
                 qtd_noturno=form.cleaned_data["qtd_noturno"],
+                modo=tipo,  # 🔥 ESSA LINHA RESOLVE TUDO
             )
+
             return redirect("escalas:detalhe_escala", escala.id)
+
     else:
         form = CriarEscalaForm()
 

@@ -9,6 +9,11 @@
     {% csrf_token %}
 
     <div class="mb-3">
+      {{ form.tipo_escala.label_tag }}
+      {{ form.tipo_escala }}
+    </div>
+
+    <div class="mb-3">
       {{ form.data_inicio.label_tag }}
       {{ form.data_inicio }}
     </div>

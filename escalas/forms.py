@@ -1,6 +1,22 @@
 from django import forms
+from django.db import models
 
 class CriarEscalaForm(forms.Form):
+    
+    class TipoEscala(models.TextChoices):
+        DINAMICA = "DIN", "⚡ Dinâmica (dia a dia)"
+        SEMANAL = "SEM", "📅 Fixa semanal"
+
+    tipo_escala = forms.ChoiceField(
+        label="Tipo de Escala",
+        choices=TipoEscala.choices,
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+            }
+        ),
+    )
+    
     data_inicio = forms.DateField(
         label="Data de início (segunda-feira)",
         widget=forms.DateInput(

@@ -1,7 +1,7 @@
 from datetime import timedelta
 from django.db import transaction
 from .models import Escala, DiaEscala, TurnoEscala, AlocacaoEscala
-from .utils import SeletorOperadores, puxar_da_fila, fila_operadores, pontuar_alocacao
+from .utils import SeletorOperadores, puxar_da_fila, fila_operadores, pontuar_alocacao, escolher_reserva, escolher_titular_semana
 from django.db import transaction
 from accounts.models import User
 from django.db.models import Q, Count
@@ -10,8 +10,46 @@ from escalas.ia.runtime import fila_operadores_com_ia
 from .fairness import puxar_da_fila_fair
 from collections import deque
 
-from pontuacao.utils import registrar_pontuacao
+from pontuacao.utils import registrar_pontuacoes_em_lote
 from django.core.exceptions import ValidationError
+
+def ultimos_titulares(secao, semanas=1):
+    from datetime import timedelta
+    from django.utils import timezone
+
+    data_limite = timezone.now().date() - timedelta(days=7 * semanas)
+
+    return set(
+        AlocacaoEscala.objects.filter(
+            turno__dia__escala__secao=secao,
+            tipo="TIT",
+            turno__dia__escala__data_inicio__gte=data_limite,
+        ).values_list("usuario_id", flat=True)
+    )
+
+def selecionar_titulares_semana(secao):
+    fila = fila_operadores(secao)
+
+    # 🔥 NOVO
+    bloqueados = ultimos_titulares(secao)
+
+    titulares = []
+    fallback = []
+
+    while fila and len(titulares) < 2:
+        op = fila.popleft()
+
+        if op.id in bloqueados:
+            fallback.append(op)  # guarda pra depois
+            continue
+
+        titulares.append(op)
+
+    # 🔥 se não conseguiu preencher (ex: poucos operadores)
+    while len(titulares) < 2 and fallback:
+        titulares.append(fallback.pop(0))
+
+    return titulares, fila
 
 def ja_escalado_no_dia(usuario_id, data, escala):
     return AlocacaoEscala.objects.filter(
@@ -40,6 +78,68 @@ TURNOS_PADRAO = ["MAD", "NOT"]
 
 from django.db import transaction
 
+def gerar_escala_semanal_fixa(dias, secao):
+    titulares, fila = selecionar_titulares_semana(secao)
+
+    for dia in dias:
+        if dia.tipo_dia == "VERMELHA":
+            continue
+
+        usados_no_dia = set()
+
+        for turno in dia.turnos.all():
+
+            # quantidade por turno
+            qtd = 1 if turno.turno in ["MAD", "NOT"] else 1
+            # (ou usa qtd_madrugada / qtd_noturno se quiser evoluir depois)
+
+            # =========================
+            # TITULARES
+            # =========================
+            for _ in range(qtd):
+
+                titular = escolher_titular_semana(
+                    data=dia.data,
+                    turno=turno,
+                    titulares=titulares,
+                    fila=fila,
+                    usados_no_dia=usados_no_dia
+                )
+
+                if not titular:
+                    continue
+
+                usados_no_dia.add(titular.id)
+
+                aloc = AlocacaoEscala.objects.create(
+                    usuario=titular,
+                    turno=turno,
+                    tipo="TIT",
+                    data=dia.data,
+                )
+
+                pontuar_alocacao(aloc)
+
+            # =========================
+            # RESERVA
+            # =========================
+            reserva = escolher_reserva(
+                data=dia.data,
+                turno=turno,
+                fila=fila,
+                usados_no_dia=usados_no_dia
+            )
+
+            if reserva:
+                usados_no_dia.add(reserva.id)
+
+                AlocacaoEscala.objects.create(
+                    usuario=reserva,
+                    turno=turno,
+                    tipo="RES",
+                    data=dia.data,
+                )
+
 @transaction.atomic
 def gerar_escala_semanal(
     secao,
@@ -47,6 +147,7 @@ def gerar_escala_semanal(
     criada_por,
     qtd_madrugada,
     qtd_noturno,
+    modo="DIN"
 ):
     escala = Escala.objects.create(
         secao=secao,
@@ -94,6 +195,16 @@ def gerar_escala_semanal(
                 amarelos.append(registro)
             else:
                 pretos.append(registro)
+                
+        if modo == "SEM":
+            dias = escala.dias.prefetch_related("turnos__alocacoes")
+
+            gerar_escala_semanal_fixa(
+                dias=dias,
+                secao=secao,
+            )
+
+            return escala
 
     # =========================
     # Helper justo
@@ -179,6 +290,7 @@ def gerar_escala_semanal(
 
     return escala
 
+
 @transaction.atomic
 def encerrar_escala(escala, usuario):
     if escala.status != Escala.Status.PUBLICADA:
@@ -188,13 +300,17 @@ def encerrar_escala(escala, usuario):
         raise PermissionError("Sem permissão.")
 
     dias = escala.dias.prefetch_related(
-        Prefetch("turnos__alocacoes")
+        "turnos__alocacoes__usuario",
+        "turnos__dia"
     )
+
+    todas_alocacoes = []
 
     for dia in dias:
         for turno in dia.turnos.all():
-            for alocacao in turno.alocacoes.all():
-                registrar_pontuacao(alocacao)
+            todas_alocacoes.extend(turno.alocacoes.all())
+
+    registrar_pontuacoes_em_lote(todas_alocacoes)
 
     escala.status = Escala.Status.ENCERRADA
     escala.save()

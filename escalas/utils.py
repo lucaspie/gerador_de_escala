@@ -7,6 +7,37 @@ from pontuacao.models import Pontuacao
 from django.db.models import F, ExpressionWrapper, FloatField
 from accounts.models import Curso
 
+def escolher_titular_semana(
+    data,
+    turno,
+    titulares,
+    fila,
+    usados_no_dia
+):
+    # 1️⃣ tenta titulares fixos
+    for op in titulares:
+        if op.id in usados_no_dia:
+            continue
+
+        if not usuario_disponivel(op, data):
+            continue
+
+        if not pode_assumir_turno(op, turno.turno):
+            continue
+
+        return op
+
+    # 2️⃣ fallback → fila (vira substituto)
+    return puxar_da_fila(fila, data, turno, usados_no_dia)
+
+def escolher_reserva(
+    data,
+    turno,
+    fila,
+    usados_no_dia
+):
+    return puxar_da_fila(fila, data, turno, usados_no_dia)
+
 def pontuar_alocacao(alocacao):
     tipo_dia = alocacao.turno.dia.tipo_dia
 
