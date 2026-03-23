@@ -135,6 +135,7 @@ def lista_usuarios(request):
 
     usuarios = (
         User.objects
+        .filter(secao=request.user.secao)
         .select_related("secao")
         .prefetch_related("cursos")
         .order_by("secao__nome", "papel", "username")

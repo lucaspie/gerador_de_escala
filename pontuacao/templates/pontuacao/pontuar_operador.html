@@ -4,69 +4,115 @@
 {% block content %}
 <div class="container mt-4">
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h3>🎖 {{ operador.get_full_name }}</h3>
-    <a href="{% url 'pontuacao:painel' %}" class="btn btn-outline-secondary">
-      ← Voltar
-    </a>
-  </div>
-
-  <form method="post" class="card p-3 shadow-sm mb-4">
-  {% csrf_token %}
-  <div class="row g-2">
-
-    <div class="col-md-3">
-      <select name="tipo" class="form-select" required>
-        <option value="">Tipo</option>
-        <option value="PRETA">Preta</option>
-        <option value="AMARELA">Amarela</option>
-        <option value="VERMELHA">Vermelha</option>
-      </select>
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <span class="text-muted small d-block">Gestão de Pontuação</span>
+            <h3 class="fw-bold mb-0">🎖️ {{ operador.get_full_name }}</h3>
+        </div>
+        <a href="{% url 'pontuacao:painel' %}" class="btn btn-light border">
+            <i class="bi bi-arrow-left"></i> Voltar
+        </a>
     </div>
 
-    <div class="col-md-2">
-      <input type="number" name="pontos"
-             class="form-control"
-             placeholder="Pts"
-             required>
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card border-0 bg-warning bg-opacity-10 shadow-sm">
+                <div class="card-body">
+                    <h6 class="fw-bold"><i class="bi bi-airplane"></i> Operações Especiais</h6>
+                    <p class="small text-muted">Ações rápidas para situações específicas de pista.</p>
+                    <a href="{% url 'pontuacao:lancar_pisteiro_manual' operador.id %}" 
+                       class="btn btn-warning w-100 fw-bold">
+                        🛫 Lançar Pisteiro Manual
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-12">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 text-primary">Novo Lançamento</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Tipo de Ocorrência</label>
+                                <select name="tipo" class="form-select border-2" required>
+                                    <option value="" disabled selected>Selecione...</option>
+                                    <option value="PRETA">⚫ Preta</option>
+                                    <option value="AMARELA">🟡 Amarela</option>
+                                    <option value="VERMELHA">🔴 Vermelha</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold">Pontos</label>
+                                <input type="number" name="pontos" class="form-control border-2" placeholder="Ex: 10" required>
+                            </div>
+
+                            <div class="col-md-5">
+                                <label class="form-label small fw-bold">Observação</label>
+                                <input type="text" name="observacao" class="form-control border-2" placeholder="Motivo do lançamento...">
+                            </div>
+
+                            <div class="col-12 mt-4 text-end">
+                                <button type="submit" class="btn btn-success px-4 py-2">
+                                    <i class="bi bi-plus-circle"></i> Confirmar Lançamento
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📜 Histórico Recente</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Data/Hora</th>
+                                <th>Tipo</th>
+                                <th>Obs.</th>
+                                <th class="text-end pe-3">Pontos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in historico %}
+                            <tr>
+                                <td class="ps-3">
+                                    <small class="text-muted d-block">{{ p.criado_em|date:"d/m/Y" }}</small>
+                                    <strong>{{ p.criado_em|date:"H:i" }}</strong>
+                                </td>
+                                <td>
+                                    {% if p.tipo == 'VERMELHA' %}
+                                        <span class="badge bg-danger">Vermelha</span>
+                                    {% elif p.tipo == 'AMARELA' %}
+                                        <span class="badge bg-warning text-dark">Amarela</span>
+                                    {% else %}
+                                        <span class="badge bg-dark">Preta</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">{{ p.observacao|default:"-" }}</small></td>
+                                <td class="text-end pe-3 fw-bold">{{ p.pontos }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">
+                                    Nenhum registro encontrado para este operador.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        
     </div>
-
-    <div class="col-md-4">
-      <input type="text" name="observacao"
-             class="form-control"
-             placeholder="Observação (opcional)">
-    </div>
-
-    <div class="col-md-3">
-      <button class="btn btn-success w-100">
-        ➕ Lançar
-      </button>
-    </div>
-
-  </div>
-</form>
-
-  <h5>📜 Histórico</h5>
-  <table class="table table-sm table-bordered">
-    <thead class="table-dark">
-      <tr>
-        <th>Data</th>
-        <th>Pontos</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in historico %}
-      <tr>
-        <td>{{ p.criado_em|date:"d/m/Y H:i" }}</td>
-        <td>{{ p.pontos }}</td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="2" class="text-center">Sem registros</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
 </div>
 {% endblock %}

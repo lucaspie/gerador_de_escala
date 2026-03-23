@@ -9,4 +9,5 @@ urlpatterns = [
     path("lancar/<int:alocacao_id>/", views.lancar_pontos, name="lancar"),
     path("painel/", views.painel_pontuacao, name="painel"),
     path("operador/<int:user_id>/", views.pontuar_operador, name="operador"),
+    path("pisteiro_manual/<int:user_id>", views.lancar_pisteiro_manual, name="lancar_pisteiro_manual"),
 ]

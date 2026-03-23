@@ -148,3 +148,34 @@ def pontuar_operador(request, user_id):
             "historico": historico,
         },
     )
+    
+@login_required
+def lancar_pisteiro_manual(request, user_id):
+    if not request.user.pode_escalar():
+        raise PermissionDenied
+
+    operador = get_object_or_404(User, id=user_id, papel="OPE")
+
+    if operador.secao != request.user.secao:
+        raise PermissionDenied
+
+    if request.method == "POST":
+        pontos = int(request.POST.get("pontos"))
+        tipo = request.POST.get("tipo")
+
+        Pontuacao.objects.create(
+            usuario=operador,
+            pontos=pontos,
+            tipo=tipo,
+            observacao="Pisteiro",
+            origem=Pontuacao.Origem.MANUAL,  # 🔥 ideal
+        )
+
+        messages.success(request, "Pontos de pisteiro lançados!")
+        return redirect("pontuacao:operador", operador.id)
+
+    return render(
+        request,
+        "pontuacao/lancar_pisteiro_manual.html",
+        {"operador": operador},
+    )

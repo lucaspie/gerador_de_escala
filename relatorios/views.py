@@ -11,6 +11,7 @@ from .services import dias_por_secao
 from .exports import exportar_pontuacao_excel
 from indisponibilidades.models import Indisponibilidade
 from escalas.models import AlocacaoEscala
+from pontuacao.models import Pontuacao
 
 @login_required
 def relatorio_pontuacao_secao(request):
@@ -52,6 +53,30 @@ def relatorio_pontuacao_secao(request):
         .order_by("-total_pistas")
     )
     
+    pisteiros_manual = (
+        Pontuacao.objects
+        .filter(
+            usuario__secao=request.user.secao,
+            observacao__icontains="PISTEIRO",
+        )
+    )
+    
+    if data_inicio:
+        pisteiros_manual = pisteiros_manual.filter(
+            criado_em__date__gte=data_inicio
+        )
+
+    if data_fim:
+        pisteiros_manual = pisteiros_manual.filter(
+            criado_em__date__lte=data_fim
+        )
+        
+    pisteiros_manual = (
+        pisteiros_manual
+        .values("usuario__username")
+        .annotate(total_pistas=Count("id"))
+    )
+    
     indisponibilidades = Indisponibilidade.objects.filter(
         usuario__secao=request.user.secao  # ajuste se necessário
     )
@@ -79,6 +104,28 @@ def relatorio_pontuacao_secao(request):
         data_inicio=data_inicio,
         data_fim=data_fim,
     )
+    
+    from collections import defaultdict
+
+    ranking_pisteiro = defaultdict(int)
+
+    # 🔥 soma escala
+    for p in pisteiros:
+        ranking_pisteiro[p["usuario__username"]] += p["total_pistas"]
+
+    # soma manual
+    for p in pisteiros_manual:
+        ranking_pisteiro[p["usuario__username"]] += p["total_pistas"]
+        
+    pisteiros_unificado = [
+        {"usuario__username": user, "total_pistas": total}
+        for user, total in ranking_pisteiro.items()
+    ]
+
+    pisteiros_unificado.sort(
+        key=lambda x: x["total_pistas"],
+        reverse=True
+    )
 
     labels = [d["usuario__username"] for d in dados]
     valores_total = [float(d["total"] or 0) for d in dados]
@@ -86,9 +133,8 @@ def relatorio_pontuacao_secao(request):
     valores_amarela = [float(d["amarela"] or 0) for d in dados]
     valores_vermelha = [float(d["vermelha"] or 0) for d in dados]
     
-    labels_pisteiro = [p["usuario__username"] for p in pisteiros]
-    valores_pisteiro = [p["total_pistas"] for p in pisteiros]
-
+    labels_pisteiro = [p["usuario__username"] for p in pisteiros_unificado]
+    valores_pisteiro = [p["total_pistas"] for p in pisteiros_unificado]
     # ===============================
     # 2️⃣ SOBREAVISO (DIAS VERMELHOS)
     # ===============================

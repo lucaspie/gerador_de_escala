@@ -126,6 +126,23 @@ def operadores_ordenados(secao):
         .order_by("total_pontos", "id")
     )
     
+def fila_operadores_balanceada(secao):
+    from .fairness import calcular_stats
+
+    stats = calcular_stats(secao)
+
+    operadores = list(
+        User.objects.filter(secao=secao, papel="OPE")
+    )
+
+    def score(op):
+        dados = stats.get(op.id, {"total": 0})
+        return dados["total"]  # simples e eficiente
+
+    operadores.sort(key=lambda op: (score(op), op.id))
+
+    return deque(operadores)
+    
 def fila_operadores(secao):
     operadores = (
         User.objects

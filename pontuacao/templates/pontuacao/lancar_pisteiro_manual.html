@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Lançar Pisteiro{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>🛫 Pisteiro — {{ operador.get_full_name }}</h3>
+
+    <a href="{% url 'pontuacao:operador' operador.id %}"
+       class="btn btn-outline-secondary">
+       ← Voltar
+    </a>
+  </div>
+
+  <form method="post" class="card p-3 shadow-sm mb-4">
+    {% csrf_token %}
+
+    <div class="row g-2">
+
+      <div class="col-md-3">
+        <select name="tipo" class="form-select" required>
+          <option value="">Tipo do dia</option>
+          <option value="PRETA">Preta</option>
+          <option value="AMARELA">Amarela</option>
+          <option value="VERMELHA">Vermelha</option>
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <input type="number"
+               name="pontos"
+               class="form-control"
+               placeholder="Pts"
+               required>
+      </div>
+
+      <div class="col-md-4">
+        <input type="text"
+               name="observacao"
+               class="form-control"
+               placeholder="Ex: Pisteiro antes do sistema">
+      </div>
+
+      <div class="col-md-3">
+        <button class="btn btn-warning w-100">
+          🛫 Lançar Pisteiro
+        </button>
+      </div>
+
+    </div>
+  </form>
+
+  <div class="alert alert-info">
+    ⚠️ Utilize este lançamento apenas para registros antigos (antes do sistema).
+  </div>
+
+</div>
+{% endblock %}

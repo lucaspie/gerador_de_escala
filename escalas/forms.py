@@ -29,7 +29,7 @@ class CriarEscalaForm(forms.Form):
 
     qtd_madrugada = forms.IntegerField(
         label="Militares por turno (Madrugada)",
-        min_value=1,
+        min_value=0,
         widget=forms.NumberInput(
             attrs={
                 "class": "form-control",
@@ -39,7 +39,7 @@ class CriarEscalaForm(forms.Form):
 
     qtd_noturno = forms.IntegerField(
         label="Militares por turno (Noturno)",
-        min_value=1,
+        min_value=0,
         widget=forms.NumberInput(
             attrs={
                 "class": "form-control",
