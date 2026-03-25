@@ -54,7 +54,7 @@ def detalhe_escala(request, escala_id):
 
     pode_editar = (
         request.user.pode_escalar()
-        and escala.status == Escala.Status.RASCUNHO
+        and escala.status != Escala.Status.ENCERRADA 
     )
 
     return render(
@@ -98,7 +98,7 @@ def editar_turno(request, turno_id):
     if not request.user.pode_escalar():
         raise PermissionDenied
 
-    if escala.status != Escala.Status.RASCUNHO:
+    if escala.status == Escala.Status.ENCERRADA:
         raise PermissionDenied("Escala não pode mais ser editada.")
 
     operadores = User.objects.filter(

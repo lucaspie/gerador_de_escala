@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from phonenumber_field.modelfields import PhoneNumberField
 
 class Curso(models.TextChoices):
     PISTA = "PIS", "Pista"
@@ -41,6 +42,8 @@ class User(AbstractUser):
         blank=True,
         related_name="usuarios",
     )
+    
+    telefone = PhoneNumberField(blank=True, null=True)
 
     precisa_trocar_senha = models.BooleanField(
         default=True,
