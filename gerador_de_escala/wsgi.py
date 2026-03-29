@@ -14,3 +14,14 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'gerador_de_escala.settings')
 
 application = get_wsgi_application()
+
+import time
+from django.db import connection
+
+def wait_for_db():
+    for _ in range(5):
+        try:
+            connection.ensure_connection()
+            return
+        except Exception:
+            time.sleep(2)

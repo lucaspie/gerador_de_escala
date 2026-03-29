@@ -65,6 +65,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "accounts.middleware.ForcarTrocaSenhaMiddleware",
+    'gerador_de_escala.middleware.DatabaseRetryMiddleware',
+    'gerador_de_escala.middleware.DatabaseRetryMiddleware',
 ]
 
 ROOT_URLCONF = 'gerador_de_escala.urls'
