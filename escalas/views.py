@@ -22,17 +22,37 @@ def criar_escala(request):
     if request.method == "POST":
         form = CriarEscalaForm(request.POST)
         if form.is_valid():
+            secao_usuario = request.user.secao
+
+            # =========================================================
+            # 🔥 O PULO DO GATO: Otimização de Performance
+            # =========================================================
+            # Buscamos todos os operadores da seção e seus cursos de UMA SÓ VEZ.
+            # Substitua 'Usuario' pelo nome correto do seu modelo de usuários.
+            usuarios = request.user.__class__.objects.filter(
+                secao=secao_usuario
+            ).prefetch_related("cursos")
+
+            # Montamos o dicionário em memória: {id_do_usuario: {codigos_de_curso}}
+            cursos_por_usuario = {
+                u.id: set(u.cursos.values_list("codigo", flat=True))
+                for u in usuarios
+            }
+            # =========================================================
 
             tipo = form.cleaned_data["tipo_escala"]
 
-            escala = gerar_escala_semanal(
-                secao=request.user.secao,
-                data_inicio=form.cleaned_data["data_inicio"],
-                criada_por=request.user,
-                qtd_madrugada=form.cleaned_data["qtd_madrugada"],
-                qtd_noturno=form.cleaned_data["qtd_noturno"],
-                modo=tipo,  # 🔥 ESSA LINHA RESOLVE TUDO
-            )
+            # Usamos atomic para garantir que a escala não fique corrompida se houver erro
+            with transaction.atomic():
+                escala = gerar_escala_semanal(
+                    secao=secao_usuario,
+                    data_inicio=form.cleaned_data["data_inicio"],
+                    criada_por=request.user,
+                    qtd_madrugada=form.cleaned_data["qtd_madrugada"],
+                    qtd_noturno=form.cleaned_data["qtd_noturno"],
+                    modo=tipo,
+                    cursos_por_usuario=cursos_por_usuario,  # 👈 Passamos o mapa aqui!
+                )
 
             return redirect("escalas:detalhe_escala", escala.id)
 

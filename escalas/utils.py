@@ -75,18 +75,13 @@ def usuario_disponivel(usuario, data):
         data_fim__gte=data,
     ).exists()
 
-def pode_assumir_turno(usuario, turno_codigo):
+def pode_assumir_turno(codigos_cursos, turno_codigo):
     """
     Retorna True se o usuário pode operar o turno informado
-    considerando seus cursos.
+    considerando seus cursos (passados como um set de códigos).
     """
-
-    cursos = set(
-        usuario.cursos.values_list("codigo", flat=True)
-    )
-
-    tem_pista = "PIS" in cursos
-    tem_manutencao = "MAN" in cursos
+    tem_pista = "PIS" in codigos_cursos
+    tem_manutencao = "MAN" in codigos_cursos
 
     if turno_codigo == "MAD":
         return tem_pista
@@ -94,7 +89,6 @@ def pode_assumir_turno(usuario, turno_codigo):
     if turno_codigo == "NOT":
         return tem_manutencao
 
-    return False
 
 class SeletorOperadores:
     def __init__(self, operadores, start_index=0):

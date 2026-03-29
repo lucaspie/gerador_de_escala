@@ -1,37 +1,41 @@
-import pytest
-from datetime import date, timedelta
 from collections import Counter
+from datetime import date, timedelta
 
-from accounts.models import User, CursoOperacional, Curso
+import pytest
+from accounts.models import Curso, CursoOperacional, User
 from escalas.models import Escala
+from escalas.services import gerar_escala_semanal
 from projetos.models import Projeto, Secao
-from escalas.services import gerar_escala_semanal, encerrar_escala, criar_sobreaviso_service
+
 
 # =========================
 # FIXTURES
 # =========================
-
 @pytest.fixture
 def secao(db):
     projeto = Projeto.objects.create(nome="Projeto Teste")
     return Secao.objects.create(nome="A", projeto=projeto)
 
+
 @pytest.fixture
 def curso_man(db):
     return CursoOperacional.objects.get_or_create(codigo=Curso.MANUTENCAO)[0]
 
+
 @pytest.fixture
 def admin_user(db):
     return User.objects.create_user(
-        username="admin", 
-        password="123", 
-        papel=User.Papel.ENCARREGADO, 
-        is_staff=True
+        username="admin",
+        password="123",
+        papel=User.Papel.ENCARREGADO,
+        is_staff=True,
     )
+
 
 @pytest.fixture
 def criar_operadores(db, secao, curso_man):
     """Helper para criar múltiplos operadores com curso."""
+
     def _criar(qtd, prefixo="op"):
         ops = []
         for i in range(qtd):
@@ -39,31 +43,45 @@ def criar_operadores(db, secao, curso_man):
                 username=f"{prefixo}{i}",
                 password="123",
                 secao=secao,
-                papel=User.Papel.OPERADOR
+                papel=User.Papel.OPERADOR,
             )
             u.cursos.add(curso_man)
             ops.append(u)
         return ops
+
     return _criar
+
+
+@pytest.fixture
+def cursos_mockados():
+    """Gera o dicionário em memória que as funções otimizadas esperam"""
+
+    def _gerar(usuarios):
+        return {
+            u.id: set(u.cursos.values_list("codigo", flat=True))
+            for u in usuarios
+        }
+
+    return _gerar
+
 
 # =========================
 # TESTES DE GERAÇÃO
 # =========================
-    
+
+
 @pytest.mark.django_db
-def test_simulacao_6_meses_fairness(secao, admin_user, criar_operadores):
-    """
-    Simula 6 meses de escalas para validar estabilidade de fairness no longo prazo.
-    """
+def test_simulacao_6_meses_fairness(
+    secao, admin_user, criar_operadores, cursos_mockados
+):
+    """Simula 6 meses de escalas para validar estabilidade de fairness no longo prazo."""
+    operadores = criar_operadores(15)  # número realista
 
-    from collections import Counter
-    from datetime import date, timedelta
-
-    criar_operadores(15)  # número realista
+    # 🔥 MOCK: Criamos o dicionário de cursos que a função otimizada exige
+    mapa_cursos = cursos_mockados(operadores)
 
     contagem = Counter()
     data_base = date(2026, 1, 5)
-
     semanas = 26  # ~6 meses
 
     for _ in range(semanas):
@@ -73,7 +91,8 @@ def test_simulacao_6_meses_fairness(secao, admin_user, criar_operadores):
             criada_por=admin_user,
             qtd_madrugada=0,
             qtd_noturno=2,
-            modo="DIN"
+            modo="SEM",
+            cursos_por_usuario=mapa_cursos,  # 👈 Passando o dicionário aqui!
         )
 
         # IMPORTANTÍSSIMO (mantém histórico válido)
@@ -96,12 +115,16 @@ def test_simulacao_6_meses_fairness(secao, admin_user, criar_operadores):
 
     # tolerância mais flexível (escala longa)
     assert diff <= 3
-    
-@pytest.mark.django_db
-def test_mesmos_operadores_todos_os_dias(secao, admin_user, criar_operadores):
-    criar_operadores(10)
 
-    from datetime import date
+
+@pytest.mark.django_db
+def test_mesmos_operadores_todos_os_dias(
+    secao, admin_user, criar_operadores, cursos_mockados
+):
+    operadores = criar_operadores(10)
+
+    # 🔥 MOCK: Criamos o dicionário de cursos
+    mapa_cursos = cursos_mockados(operadores)
 
     escala = gerar_escala_semanal(
         secao=secao,
@@ -109,7 +132,8 @@ def test_mesmos_operadores_todos_os_dias(secao, admin_user, criar_operadores):
         criada_por=admin_user,
         qtd_madrugada=0,
         qtd_noturno=2,
-        modo="SEM"
+        modo="SEM",
+        cursos_por_usuario=mapa_cursos,  # 👈 Passando o dicionário aqui!
     )
 
     operadores_por_dia = []
@@ -131,13 +155,17 @@ def test_mesmos_operadores_todos_os_dias(secao, admin_user, criar_operadores):
 
     for i, ops in enumerate(operadores_por_dia[1:], start=1):
         assert ops == base, f"Dia {i} diferente: {ops} != {base}"
-        
-        
+
+
 @pytest.mark.django_db
-def test_substituicao_por_indisponibilidade(secao, admin_user, criar_operadores):
+def test_substituicao_por_indisponibilidade(
+    secao, admin_user, criar_operadores, cursos_mockados
+):
     ops = criar_operadores(5)
 
-    from datetime import date
+    # 🔥 MOCK: Criamos o dicionário de cursos
+    mapa_cursos = cursos_mockados(ops)
+
     from indisponibilidades.models import Indisponibilidade
 
     # deixa um operador indisponível no meio da semana
@@ -153,7 +181,8 @@ def test_substituicao_por_indisponibilidade(secao, admin_user, criar_operadores)
         criada_por=admin_user,
         qtd_madrugada=0,
         qtd_noturno=2,
-        modo="SEM"
+        modo="SEM",
+        cursos_por_usuario=mapa_cursos,  # 👈 Passando o dicionário aqui!
     )
 
     operadores_por_dia = []

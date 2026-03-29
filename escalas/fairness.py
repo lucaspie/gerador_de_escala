@@ -78,22 +78,21 @@ def score_usuario(stats, usuario_id, turno, min_total, min_preta, min_amarela):
 # =========================
 # FILA JUSTA (core do sistema)
 # =========================
-def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None):
+def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None, cursos_por_usuario=None):
     """
-    Seleção com fairness real:
-    - menor carga histórica
-    - balanceamento por tipo de dia
-    - atualização incremental consistente
+    Seleção com fairness real (Versão Otimizada)
     """
 
     if not fila:
         return None
 
-    # =========================
-    # Stats base (somente se necessário)
-    # =========================
     if stats is None:
         stats = calcular_stats(secao)
+        
+    # Se não for passado, cria vazio para não quebrar, 
+    # mas o ideal é sempre passar para ter performance!
+    if cursos_por_usuario is None:
+        cursos_por_usuario = {}
 
     # =========================
     # Filtrar candidatos válidos
@@ -101,17 +100,19 @@ def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None):
     candidatos = []
 
     for op in fila:
-
         if op.id in usados_no_dia:
             continue
 
         if not usuario_disponivel(op, data):
             continue
 
-        if turno.turno == "MAD" and not pode_assumir_turno(op, "MAD"):
+        # Pegamos os cursos direto da memória (dicionário)
+        codigos_cursos = cursos_por_usuario.get(op.id, set())
+
+        if turno.turno == "MAD" and not pode_assumir_turno(codigos_cursos, "MAD"):
             continue
 
-        if turno.turno == "NOT" and not pode_assumir_turno(op, "NOT"):
+        if turno.turno == "NOT" and not pode_assumir_turno(codigos_cursos, "NOT"):
             continue
 
         candidatos.append(op)
@@ -123,14 +124,17 @@ def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None):
     # Regra NOT (garantir habilitado)
     # =========================
     if turno.turno == "NOT":
-        ja_tem_habilitado = turno.alocacoes.filter(
-            usuario__cursos__codigo="MAN"
-        ).exists()
+        # Evita bater no banco com .filter().exists()
+        ja_tem_habilitado = any(
+            "MAN" in cursos_por_usuario.get(aloc.usuario_id, set())
+            for aloc in turno.alocacoes.all()
+        )
 
         if not ja_tem_habilitado:
+            # Filtra em memória usando o set de cursos
             habilitados = [
                 op for op in candidatos
-                if op.cursos.filter(codigo="MAN").exists()
+                if "MAN" in cursos_por_usuario.get(op.id, set())
             ]
             if habilitados:
                 candidatos = habilitados
@@ -138,20 +142,9 @@ def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None):
     # =========================
     # Calcular mínimos (base fairness)
     # =========================
-    min_total = min(
-        stats.get(op.id, {}).get("total", 0)
-        for op in candidatos
-    )
-
-    min_preta = min(
-        stats.get(op.id, {}).get("preta", 0)
-        for op in candidatos
-    )
-
-    min_amarela = min(
-        stats.get(op.id, {}).get("amarela", 0)
-        for op in candidatos
-    )
+    min_total = min(stats.get(op.id, {}).get("total", 0) for op in candidatos)
+    min_preta = min(stats.get(op.id, {}).get("preta", 0) for op in candidatos)
+    min_amarela = min(stats.get(op.id, {}).get("amarela", 0) for op in candidatos)
 
     # =========================
     # Score + ordenação determinística
@@ -170,23 +163,19 @@ def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None):
         candidatos_score.append((score, op.id, op))
 
     candidatos_score.sort(key=lambda x: (x[0], x[1]))
-
     escolhido = candidatos_score[0][2]
 
     # =========================
     # 🔥 UPDATE INCREMENTAL (ESSENCIAL)
     # =========================
     stats.setdefault(escolhido.id, {"total": 0, "preta": 0, "amarela": 0})
-
     stats[escolhido.id]["total"] += 1
 
     if turno.dia.tipo_dia == "PRETA":
         stats[escolhido.id]["preta"] += 1
-
     elif turno.dia.tipo_dia == "AMARELA":
         stats[escolhido.id]["amarela"] += 1
 
-    # ❗ NÃO rotaciona fila (fairness já decide)
     fila.remove(escolhido)
     fila.append(escolhido)
 

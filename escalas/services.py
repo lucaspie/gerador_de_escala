@@ -111,7 +111,8 @@ def alocar_turno(
     usados_no_dia,
     secao,
     stats,
-    tipo="TIT"
+    tipo="TIT",
+    cursos_por_usuario=None # 👈 1. Adicionado aqui
 ):
     alocados = []
 
@@ -122,8 +123,15 @@ def alocar_turno(
 
         # 🔁 tenta achar alguém válido
         for _ in range(len(fila)):
+            # 👈 2. Repassamos o dicionário aqui para a função 'puxar_da_fila_fair'
             candidato = puxar_da_fila_fair(
-                fila, data, turno, usados_no_dia, secao, stats=stats
+                fila, 
+                data, 
+                turno, 
+                usados_no_dia, 
+                secao, 
+                stats=stats,
+                cursos_por_usuario=cursos_por_usuario 
             )
 
             if not candidato:
@@ -213,14 +221,15 @@ def gerar_escala_semanal_fixa(
             # =========================
             # 3️⃣ TITULARES FIXOS
             # =========================
+
             candidatos_fixos = [
                 op for op in operadores_semana
                 if op.id not in usados_no_dia
                 and usuario_disponivel(op, dia.data)
-                and not (turno.turno == "MAD" and not pode_assumir_turno(op, "MAD"))
-                and not (turno.turno == "NOT" and not pode_assumir_turno(op, "NOT"))
+                # 🟢 A mágica acontece aqui: pegamos o set de cursos dentro do loop para cada 'op'
+                and not (turno.turno == "MAD" and not pode_assumir_turno(set(op.cursos.values_list("codigo", flat=True)), "MAD"))
+                and not (turno.turno == "NOT" and not pode_assumir_turno(set(op.cursos.values_list("codigo", flat=True)), "NOT"))
             ]
-
             # 🔥 pega os primeiros disponíveis
             selecionados = candidatos_fixos[:qtd]
 
@@ -367,15 +376,14 @@ def criar_sobreaviso_service(secao, data, quantidade, criada_por):
 
     return escala
 
+from datetime import timedelta
+from django.core.exceptions import ValidationError
+from django.db import transaction
+
+# Remova o @transaction.atomic se você for usar o `with transaction.atomic()` na View, 
+# mas deixar ele aqui também não causa problemas (o Django apenas reaproveita a transação).
 @transaction.atomic
-def gerar_escala_semanal(
-    secao,
-    data_inicio,
-    criada_por,
-    qtd_madrugada,
-    qtd_noturno,
-    modo="DIN"
-):
+def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_noturno, modo="DIN", cursos_por_usuario=None):
     escala = Escala.objects.create(
         secao=secao,
         data_inicio=data_inicio,
@@ -385,6 +393,10 @@ def gerar_escala_semanal(
 
     fila = fila_operadores_balanceada(secao)
     stats = calcular_stats(secao)
+
+    # 🔴 GARANTIA: Se a função for chamada sem o dicionário (ex: em algum teste), ela cria um vazio para não quebrar
+    if cursos_por_usuario is None:
+        cursos_por_usuario = {}
 
     dias_processados = []
 
@@ -448,6 +460,7 @@ def gerar_escala_semanal(
         if qtd == 0:
             continue
 
+        # 🟢 PASSANDO O DICIONÁRIO PARA O ALOCADOR
         alocar_turno(
             turno=turno,
             data=data,
@@ -456,20 +469,26 @@ def gerar_escala_semanal(
             usados_no_dia=usados_no_dia,
             secao=secao,
             stats=stats,
-            tipo="TIT"
+            tipo="TIT",
+            cursos_por_usuario=cursos_por_usuario  # 👈 ADICIONE ISSO AQUI
         )
 
     # =========================
-    # 3️⃣ VALIDAR NOT
+    # 3️⃣ VALIDAR NOT (OTIMIZADO)
     # =========================
     for data, turno_codigo, turno in dias_processados:
         if turno_codigo != "NOT" or qtd_noturno == 0:
             continue
 
-        if not turno.alocacoes.filter(
-            usuario__cursos__codigo="MAN",
-            tipo="TIT"
-        ).exists():
+        # 🟢 TROCAMOS O turno.alocacoes.filter(...).exists() por uma busca em memória
+        # Isso evita 7 idas ao banco de dados no final do algoritmo!
+        ja_tem_habilitado = any(
+            "MAN" in cursos_por_usuario.get(aloc.usuario_id, set())
+            for aloc in turno.alocacoes.all()
+            if aloc.tipo == "TIT"
+        )
+
+        if not ja_tem_habilitado:
             raise ValidationError(
                 f"Turno noturno do dia {data} ficou sem habilitado."
             )
@@ -481,6 +500,7 @@ def gerar_escala_semanal(
 
         usados_no_dia = usados_global.setdefault(data, set())
 
+        # 🟢 PASSANDO O DICIONÁRIO PARA O ALOCADOR DE RESERVAS
         alocar_turno(
             turno=turno,
             data=data,
@@ -489,7 +509,8 @@ def gerar_escala_semanal(
             usados_no_dia=usados_no_dia,
             secao=secao,
             stats=stats,
-            tipo="RES"
+            tipo="RES",
+            cursos_por_usuario=cursos_por_usuario  # 👈 ADICIONE ISSO AQUI TAMBÉM
         )
 
     return escala
