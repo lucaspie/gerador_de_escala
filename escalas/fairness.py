@@ -187,6 +187,8 @@ def puxar_da_fila_fair(fila, data, turno, usados_no_dia, secao, stats=None):
         stats[escolhido.id]["amarela"] += 1
 
     # ❗ NÃO rotaciona fila (fairness já decide)
+    fila.remove(escolhido)
+    fila.append(escolhido)
 
     return escolhido
 

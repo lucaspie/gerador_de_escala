@@ -115,27 +115,48 @@ def alocar_turno(
 ):
     alocados = []
 
+    from django.db import IntegrityError
+
     for _ in range(qtd):
-        op = puxar_da_fila_fair(
-            fila, data, turno, usados_no_dia, secao, stats=stats
-        )
+        op = None
+
+        # 🔁 tenta achar alguém válido
+        for _ in range(len(fila)):
+            candidato = puxar_da_fila_fair(
+                fila, data, turno, usados_no_dia, secao, stats=stats
+            )
+
+            if not candidato:
+                break
+
+            # 🚫 JÁ FOI USADO → ignora
+            if candidato.id in usados_no_dia:
+                continue
+
+            op = candidato
+            break
 
         if not op:
             break
 
-        usados_no_dia.add(op.id)
+        try:
+            aloc = AlocacaoEscala.objects.create(
+                turno=turno,
+                usuario=op,
+                tipo=tipo,
+                data=data,
+            )
 
-        aloc = AlocacaoEscala.objects.create(
-            turno=turno,
-            usuario=op,
-            tipo=tipo,
-            data=data,
-        )
+            usados_no_dia.add(op.id)
 
-        if tipo == "TIT":
-            pontuar_alocacao(aloc)
+            if tipo == "TIT":
+                pontuar_alocacao(aloc)
 
-        alocados.append(op)
+            alocados.append(op)
+
+        except IntegrityError:
+            # 🛡️ proteção extra contra concorrência
+            continue
 
     return alocados
 
@@ -259,134 +280,6 @@ def gerar_escala_semanal_fixa(
                         tipo="RES",
                         data=dia.data,
                     )
-
-@transaction.atomic
-def gerar_escala_semanal(
-    secao,
-    data_inicio,
-    criada_por,
-    qtd_madrugada,
-    qtd_noturno,
-    modo="DIN"
-):
-    escala = Escala.objects.create(
-        secao=secao,
-        data_inicio=data_inicio,
-        data_fim=data_inicio + timedelta(days=6),
-        criada_por=criada_por,
-    )
-
-    fila = fila_operadores_balanceada(secao)
-    stats = calcular_stats(secao)
-
-    dias_processados = []
-
-    # =========================
-    # 1️⃣ Criar estrutura
-    # =========================
-    for i in range(7):
-        data = data_inicio + timedelta(days=i)
-        weekday = data.weekday()
-
-        tipo_dia = (
-            "PRETA" if weekday < 4
-            else "AMARELA" if weekday == 4
-            else "VERMELHA"
-        )
-
-        dia = DiaEscala.objects.create(
-            escala=escala,
-            data=data,
-            tipo_dia=tipo_dia,
-        )
-
-        if tipo_dia == "VERMELHA":
-            continue
-
-        for turno_codigo in TURNOS_PADRAO:
-            turno = TurnoEscala.objects.create(
-                dia=dia,
-                turno=turno_codigo,
-            )
-
-            dias_processados.append((data, turno_codigo, turno))
-
-    # =========================
-    # MODO FIXO
-    # =========================
-    if modo == "SEM":
-        dias = escala.dias.prefetch_related("turnos__alocacoes")
-
-        gerar_escala_semanal_fixa(
-            dias,
-            secao,
-            qtd_operadores_semana=6,
-            qtd_madrugada=qtd_madrugada,
-            qtd_noturno=qtd_noturno,
-            usar_reserva=True
-        )
-        return escala
-
-    # =========================
-    # 2️⃣ ALOCAÇÃO PRINCIPAL
-    # =========================
-    usados_global = {}
-
-    for data, turno_codigo, turno in dias_processados:
-
-        usados_no_dia = usados_global.setdefault(data, set())
-
-        qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
-
-        if qtd == 0:
-            continue
-
-        alocar_turno(
-            turno=turno,
-            data=data,
-            qtd=qtd,
-            fila=fila,
-            usados_no_dia=usados_no_dia,
-            secao=secao,
-            stats=stats,
-            tipo="TIT"
-        )
-
-    # =========================
-    # 3️⃣ VALIDAR NOT
-    # =========================
-    for data, turno_codigo, turno in dias_processados:
-        if turno_codigo != "NOT" or qtd_noturno == 0:
-            continue
-
-        if not turno.alocacoes.filter(
-            usuario__cursos__codigo="MAN",
-            tipo="TIT"
-        ).exists():
-            raise ValidationError(
-                f"Turno noturno do dia {data} ficou sem habilitado."
-            )
-
-    # =========================
-    # 4️⃣ RESERVAS
-    # =========================
-    for data, turno_codigo, turno in dias_processados:
-
-        usados_no_dia = usados_global.setdefault(data, set())
-
-        alocar_turno(
-            turno=turno,
-            data=data,
-            qtd=1,
-            fila=fila,
-            usados_no_dia=usados_no_dia,
-            secao=secao,
-            stats=stats,
-            tipo="RES"
-        )
-
-    return escala
-
 
 @transaction.atomic
 def encerrar_escala(escala, usuario):
