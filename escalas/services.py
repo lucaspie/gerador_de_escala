@@ -7,7 +7,7 @@ from accounts.models import User
 from django.db.models import Q, Count
 from django.db.models import Prefetch
 from escalas.ia.runtime import fila_operadores_com_ia
-from .fairness import puxar_da_fila_fair, calcular_stats, pode_assumir_turno, usuario_disponivel
+from .fairness import puxar_da_fila_fair, puxar_da_fila_fixa, calcular_stats, pode_assumir_turno, usuario_disponivel
 from collections import deque
 
 from pontuacao.utils import registrar_pontuacoes_em_lote
@@ -163,7 +163,7 @@ def alocar_turno(
             alocados.append(op)
 
         except IntegrityError:
-            # 🛡️ proteção extra contra concorrência
+            print(f"Aviso: Usuário {candidato.id} já possui escala no dia {data}. Pulando.")
             continue
 
     return alocados
@@ -174,17 +174,16 @@ def gerar_escala_semanal_fixa(
     qtd_operadores_semana,
     qtd_madrugada,
     qtd_noturno,
-    usar_reserva=True
+    usar_reserva=True,
+    cursos_por_usuario=None # 👈 1. Recebe o dicionário aqui
 ):
-    # =========================
-    # 1️⃣ Seleciona grupo fixo
-    # =========================
-    
-    stats = calcular_stats(secao, dias=365)
+    if cursos_por_usuario is None:
+        cursos_por_usuario = {}
 
-    operadores = list(
-        User.objects.filter(secao=secao, papel="OPE")
-    )
+    stats = calcular_stats(secao, dias=365)
+    stats_semana = {} # Inicializa o controle da semana
+
+    operadores = list(User.objects.filter(secao=secao, papel="OPE"))
 
     def score(op):
         dados = stats.get(op.id, {"total": 0, "preta": 0, "amarela": 0})
@@ -196,15 +195,9 @@ def gerar_escala_semanal_fixa(
 
     operadores.sort(key=lambda op: (score(op), op.id))
 
-    # 🔥 GRUPO FIXO DA SEMANA
     operadores_semana = operadores[:qtd_operadores_semana]
-
-    # 🔥 RESTO = fallback
     fila_fallback = deque(operadores[qtd_operadores_semana:])
 
-    # =========================
-    # 2️⃣ LOOP DOS DIAS
-    # =========================
     for dia in dias:
         if dia.tipo_dia == "VERMELHA":
             continue
@@ -212,38 +205,47 @@ def gerar_escala_semanal_fixa(
         usados_no_dia = set()
 
         for turno in dia.turnos.all():
-
             qtd = qtd_madrugada if turno.turno == "MAD" else qtd_noturno
 
             if qtd == 0:
                 continue
 
             # =========================
-            # 3️⃣ TITULARES FIXOS
+            # TITULARES FIXOS
             # =========================
+            candidatos_fixos = []
+            for op in operadores_semana:
+                if op.id in usados_no_dia:
+                    continue
+                if not usuario_disponivel(op, dia.data):
+                    continue
+                
+                # 🟢 2. Usando o dicionário em memória em vez de bater no banco
+                codigos_cursos = cursos_por_usuario.get(op.id, set())
+                
+                if turno.turno == "MAD" and not pode_assumir_turno(codigos_cursos, "MAD"):
+                    continue
+                if turno.turno == "NOT" and not pode_assumir_turno(codigos_cursos, "NOT"):
+                    continue
+                    
+                candidatos_fixos.append(op)
 
-            candidatos_fixos = [
-                op for op in operadores_semana
-                if op.id not in usados_no_dia
-                and usuario_disponivel(op, dia.data)
-                # 🟢 A mágica acontece aqui: pegamos o set de cursos dentro do loop para cada 'op'
-                and not (turno.turno == "MAD" and not pode_assumir_turno(set(op.cursos.values_list("codigo", flat=True)), "MAD"))
-                and not (turno.turno == "NOT" and not pode_assumir_turno(set(op.cursos.values_list("codigo", flat=True)), "NOT"))
-            ]
-            # 🔥 pega os primeiros disponíveis
             selecionados = candidatos_fixos[:qtd]
 
             # =========================
-            # 🔁 COMPLETA COM FALLBACK
+            # COMPLETA COM FALLBACK
             # =========================
             while len(selecionados) < qtd:
-                op = puxar_da_fila_fair(
+                # 🟢 3. Passando o dicionário para a função que alteramos no Passo 1
+                op = puxar_da_fila_fixa(
                     fila_fallback,
                     dia.data,
                     turno,
                     usados_no_dia,
                     secao,
-                    stats=stats
+                    stats=stats,
+                    stats_semana=stats_semana,
+                    cursos_por_usuario=cursos_por_usuario
                 )
 
                 if not op:
@@ -251,38 +253,35 @@ def gerar_escala_semanal_fixa(
 
                 selecionados.append(op)
 
-            # =========================
-            # 💾 SALVAR TITULARES
-            # =========================
+            # SALVAR TITULARES
             for op in selecionados:
                 usados_no_dia.add(op.id)
-
                 aloc = AlocacaoEscala.objects.create(
                     turno=turno,
                     usuario=op,
                     tipo="TIT",
                     data=dia.data,
                 )
-
                 pontuar_alocacao(aloc)
 
             # =========================
-            # 4️⃣ RESERVA (opcional)
+            # RESERVA
             # =========================
             if usar_reserva:
-
-                op = puxar_da_fila_fair(
+                # 🟢 4. Passando o dicionário aqui também
+                op = puxar_da_fila_fixa(
                     fila_fallback,
                     dia.data,
                     turno,
                     usados_no_dia,
                     secao,
-                    stats=stats
+                    stats=stats,
+                    stats_semana=stats_semana,
+                    cursos_por_usuario=cursos_por_usuario
                 )
 
                 if op:
                     usados_no_dia.add(op.id)
-
                     AlocacaoEscala.objects.create(
                         turno=turno,
                         usuario=op,
@@ -442,7 +441,8 @@ def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_notu
             qtd_operadores_semana=6,
             qtd_madrugada=qtd_madrugada,
             qtd_noturno=qtd_noturno,
-            usar_reserva=True
+            usar_reserva=True,
+            cursos_por_usuario=cursos_por_usuario  # 👈 ADICIONE ISSO AQUI
         )
         return escala
 

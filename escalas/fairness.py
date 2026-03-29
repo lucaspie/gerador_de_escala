@@ -188,28 +188,33 @@ def puxar_da_fila_fixa(
     usados_no_dia,
     secao,
     stats,
-    stats_semana
+    stats_semana,
+    cursos_por_usuario=None # 👈 Adicionado aqui
 ):
     """
     Versão para escala fixa:
     - fairness histórico (leve)
     - fairness semanal (forte)
     """
+    if cursos_por_usuario is None:
+        cursos_por_usuario = {}
 
     candidatos = []
 
     for op in fila:
-
         if op.id in usados_no_dia:
             continue
 
         if not usuario_disponivel(op, data):
             continue
 
-        if turno.turno == "MAD" and not pode_assumir_turno(op, "MAD"):
+        # 🟢 Pegamos os cursos direto da memória
+        codigos_cursos = cursos_por_usuario.get(op.id, set())
+
+        if turno.turno == "MAD" and not pode_assumir_turno(codigos_cursos, "MAD"):
             continue
 
-        if turno.turno == "NOT" and not pode_assumir_turno(op, "NOT"):
+        if turno.turno == "NOT" and not pode_assumir_turno(codigos_cursos, "NOT"):
             continue
 
         candidatos.append(op)
@@ -235,7 +240,6 @@ def puxar_da_fila_fixa(
     min_amarela = min(stats.get(op.id, {}).get("amarela", 0) for op in candidatos)
 
     for op in candidatos:
-        # histórico (leve)
         score_hist = score_usuario(
             stats,
             op.id,
@@ -245,7 +249,6 @@ def puxar_da_fila_fixa(
             min_amarela
         )
 
-        # semanal (forte)
         score_semana = stats_semana.get(op.id, 0)
 
         score = (
@@ -260,13 +263,10 @@ def puxar_da_fila_fixa(
     escolhido = candidatos_score[0][2]
 
     # =========================
-    # UPDATE SEMANA
+    # UPDATE SEMANA E HISTÓRICO
     # =========================
     stats_semana[escolhido.id] = stats_semana.get(escolhido.id, 0) + 1
 
-    # =========================
-    # UPDATE HISTÓRICO (leve)
-    # =========================
     stats.setdefault(escolhido.id, {"total": 0, "preta": 0, "amarela": 0})
     stats[escolhido.id]["total"] += 1
 
@@ -275,9 +275,6 @@ def puxar_da_fila_fixa(
     elif turno.dia.tipo_dia == "AMARELA":
         stats[escolhido.id]["amarela"] += 1
 
-    # =========================
-    # ROTAÇÃO (IMPORTANTE)
-    # =========================
     fila.remove(escolhido)
     fila.append(escolhido)
 
