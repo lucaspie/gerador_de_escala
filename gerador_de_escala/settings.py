@@ -66,7 +66,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "accounts.middleware.ForcarTrocaSenhaMiddleware",
     'gerador_de_escala.middleware.DatabaseRetryMiddleware',
-    'gerador_de_escala.middleware.DatabaseRetryMiddleware',
 ]
 
 ROOT_URLCONF = 'gerador_de_escala.urls'
@@ -97,7 +96,8 @@ db_url = os.getenv("DATABASE_PUBLIC_URL") or os.getenv("DATABASE_URL")
 DATABASES = {
     "default": dj_database_url.config(
         default=db_url,
-        conn_max_age=600,
+        conn_max_age=60,
+        conn_health_checks=True,
         ssl_require=True,
     )
 }
