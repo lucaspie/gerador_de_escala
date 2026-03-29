@@ -9,4 +9,6 @@ urlpatterns = [
     path("nova/", views.criar_indisponibilidade, name="nova"),
     path("<int:pk>/excluir/", views.excluir_indisponibilidade, name="excluir"),
     path("secao/", views.indisponibilidades_secao, name="secao"),
+    path("aprovar/<int:pk>/", views.aprovar_indisponibilidade, name="aprovar"),
+    path("recusar/<int:pk>/", views.recusar_indisponibilidade, name="recusar"),
 ]

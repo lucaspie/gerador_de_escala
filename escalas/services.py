@@ -7,9 +7,9 @@ from accounts.models import User
 from django.db.models import Q, Count
 from django.db.models import Prefetch
 from escalas.ia.runtime import fila_operadores_com_ia
-from .fairness import puxar_da_fila_fair, puxar_da_fila_fixa, calcular_stats, pode_assumir_turno, usuario_disponivel
+from .fairness import usuario_disponivel_ctx, puxar_da_fila_fair, puxar_da_fila_fixa, calcular_stats, pode_assumir_turno, usuario_disponivel
 from collections import deque
-
+from indisponibilidades.services import montar_mapa_indisponibilidade
 from pontuacao.utils import registrar_pontuacoes_em_lote
 from django.core.exceptions import ValidationError
 
@@ -112,7 +112,8 @@ def alocar_turno(
     secao,
     stats,
     tipo="TIT",
-    cursos_por_usuario=None # 👈 1. Adicionado aqui
+    cursos_por_usuario=None,
+    ctx=None
 ):
     alocados = []
 
@@ -131,7 +132,8 @@ def alocar_turno(
                 usados_no_dia, 
                 secao, 
                 stats=stats,
-                cursos_por_usuario=cursos_por_usuario 
+                cursos_por_usuario=cursos_por_usuario,
+                ctx=ctx 
             )
 
             if not candidato:
@@ -175,16 +177,20 @@ def gerar_escala_semanal_fixa(
     qtd_madrugada,
     qtd_noturno,
     usar_reserva=True,
-    cursos_por_usuario=None # 👈 1. Recebe o dicionário aqui
+    cursos_por_usuario=None
 ):
-    if cursos_por_usuario is None:
-        cursos_por_usuario = {}
+    cursos_por_usuario = cursos_por_usuario or {}
 
     stats = calcular_stats(secao, dias=365)
-    stats_semana = {} # Inicializa o controle da semana
+    stats_semana = {}
 
-    operadores = list(User.objects.filter(secao=secao, papel="OPE"))
+    operadores = list(
+        User.objects.filter(secao=secao, papel="OPE")
+    )
 
+    # =========================
+    # SCORE BASE
+    # =========================
     def score(op):
         dados = stats.get(op.id, {"total": 0, "preta": 0, "amarela": 0})
         return (
@@ -198,6 +204,18 @@ def gerar_escala_semanal_fixa(
     operadores_semana = operadores[:qtd_operadores_semana]
     fila_fallback = deque(operadores[qtd_operadores_semana:])
 
+    # =========================
+    # 🔥 CONTEXTO GLOBAL
+    # =========================
+    datas = [dia.data for dia in dias]
+
+    ctx = {
+        "mapa_indisp": montar_mapa_indisponibilidade(secao, datas)
+    }
+
+    # =========================
+    # LOOP PRINCIPAL
+    # =========================
     for dia in dias:
         if dia.tipo_dia == "VERMELHA":
             continue
@@ -214,38 +232,40 @@ def gerar_escala_semanal_fixa(
             # TITULARES FIXOS
             # =========================
             candidatos_fixos = []
+
             for op in operadores_semana:
                 if op.id in usados_no_dia:
                     continue
-                if not usuario_disponivel(op, dia.data):
+
+                if not usuario_disponivel_ctx(op.id, dia.data, ctx):
                     continue
-                
-                # 🟢 2. Usando o dicionário em memória em vez de bater no banco
-                codigos_cursos = cursos_por_usuario.get(op.id, set())
-                
-                if turno.turno == "MAD" and not pode_assumir_turno(codigos_cursos, "MAD"):
+
+                codigos = cursos_por_usuario.get(op.id, set())
+
+                if turno.turno == "MAD" and not pode_assumir_turno(codigos, "MAD"):
                     continue
-                if turno.turno == "NOT" and not pode_assumir_turno(codigos_cursos, "NOT"):
+
+                if turno.turno == "NOT" and not pode_assumir_turno(codigos, "NOT"):
                     continue
-                    
+
                 candidatos_fixos.append(op)
 
             selecionados = candidatos_fixos[:qtd]
 
             # =========================
-            # COMPLETA COM FALLBACK
+            # FALLBACK
             # =========================
             while len(selecionados) < qtd:
-                # 🟢 3. Passando o dicionário para a função que alteramos no Passo 1
                 op = puxar_da_fila_fixa(
-                    fila_fallback,
-                    dia.data,
-                    turno,
-                    usados_no_dia,
-                    secao,
+                    fila=fila_fallback,
+                    data=dia.data,
+                    turno=turno,
+                    usados_no_dia=usados_no_dia,
+                    secao=secao,
                     stats=stats,
                     stats_semana=stats_semana,
-                    cursos_por_usuario=cursos_por_usuario
+                    cursos_por_usuario=cursos_por_usuario,
+                    ctx=ctx
                 )
 
                 if not op:
@@ -253,35 +273,40 @@ def gerar_escala_semanal_fixa(
 
                 selecionados.append(op)
 
+            # =========================
             # SALVAR TITULARES
+            # =========================
             for op in selecionados:
                 usados_no_dia.add(op.id)
+
                 aloc = AlocacaoEscala.objects.create(
                     turno=turno,
                     usuario=op,
                     tipo="TIT",
                     data=dia.data,
                 )
+
                 pontuar_alocacao(aloc)
 
             # =========================
             # RESERVA
             # =========================
             if usar_reserva:
-                # 🟢 4. Passando o dicionário aqui também
                 op = puxar_da_fila_fixa(
-                    fila_fallback,
-                    dia.data,
-                    turno,
-                    usados_no_dia,
-                    secao,
+                    fila=fila_fallback,
+                    data=dia.data,
+                    turno=turno,
+                    usados_no_dia=usados_no_dia,
+                    secao=secao,
                     stats=stats,
                     stats_semana=stats_semana,
-                    cursos_por_usuario=cursos_por_usuario
+                    cursos_por_usuario=cursos_por_usuario,
+                    ctx=ctx
                 )
 
                 if op:
                     usados_no_dia.add(op.id)
+
                     AlocacaoEscala.objects.create(
                         turno=turno,
                         usuario=op,
@@ -290,113 +315,28 @@ def gerar_escala_semanal_fixa(
                     )
 
 @transaction.atomic
-def encerrar_escala(escala, usuario):
-    if escala.status != Escala.Status.PUBLICADA:
-        raise ValueError("A escala precisa estar publicada.")
-
-    if not usuario.pode_escalar():
-        raise PermissionError("Sem permissão.")
-
-    dias = escala.dias.prefetch_related(
-        "turnos__alocacoes__usuario",
-        "turnos__dia"
-    )
-
-    todas_alocacoes = []
-
-    for dia in dias:
-        for turno in dia.turnos.all():
-            todas_alocacoes.extend(turno.alocacoes.all())
-
-    registrar_pontuacoes_em_lote(todas_alocacoes)
-
-    escala.status = Escala.Status.ENCERRADA
-    escala.save()
-
-@transaction.atomic
-def criar_sobreaviso_service(secao, data, quantidade, criada_por):
-    escala = Escala.objects.create(
-        secao=secao,
-        data_inicio=data,
-        data_fim=data,
-        criada_por=criada_por,
-        tipo=Escala.Tipo.SOBREAVISO,
-    )
-
-    dia = DiaEscala.objects.create(
-        escala=escala,
-        data=data,
-        tipo_dia="VERMELHA",
-    )
-
-    turno = TurnoEscala.objects.create(
-        dia=dia,
-        turno="SOB",
-    )
-
-    operadores = list(
-        User.objects
-        .filter(secao=secao, papel="OPE")
-        .annotate(
-            total_sobreaviso=Count(
-                "alocacoes",
-                filter=Q(alocacoes__tipo="SOB")
-            )
-        )
-        .order_by("total_sobreaviso", "id")
-    )
-
-    seletor = SeletorOperadores(operadores)
-    usados = set()
-
-    for _ in range(quantidade):
-        usuario = None
-
-        for _ in range(len(operadores)):
-            candidato = seletor.proximo(data, usados)
-            if not candidato:
-                break
-
-            usuario = candidato
-            break
-
-        if not usuario:
-            break
-
-        AlocacaoEscala.objects.create(
-            turno=turno,
-            usuario=usuario,
-            tipo="SOB",
-            foi_acionado=False,
-            data=data,  # 🔥 OBRIGATÓRIO AGORA
-        )
-
-        usados.add(usuario.id)
-
-    return escala
-
-from datetime import timedelta
-from django.core.exceptions import ValidationError
-from django.db import transaction
-
-# Remova o @transaction.atomic se você for usar o `with transaction.atomic()` na View, 
-# mas deixar ele aqui também não causa problemas (o Django apenas reaproveita a transação).
-@transaction.atomic
-def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_noturno, modo="DIN", cursos_por_usuario=None):
+def gerar_escala_semanal(
+    secao,
+    data_inicio,
+    criada_por,
+    qtd_madrugada,
+    qtd_noturno,
+    modo="DIN",
+    cursos_por_usuario=None
+):
     escala = Escala.objects.create(
         secao=secao,
         data_inicio=data_inicio,
         data_fim=data_inicio + timedelta(days=6),
         criada_por=criada_por,
     )
+    
+    
 
     fila = fila_operadores_balanceada(secao)
     stats = calcular_stats(secao)
-
-    # 🔴 GARANTIA: Se a função for chamada sem o dicionário (ex: em algum teste), ela cria um vazio para não quebrar
-    if cursos_por_usuario is None:
-        cursos_por_usuario = {}
-
+    cursos_por_usuario = cursos_por_usuario or {}
+    
     dias_processados = []
 
     # =========================
@@ -430,29 +370,36 @@ def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_notu
             dias_processados.append((data, turno_codigo, turno))
 
     # =========================
+    # 2️⃣ CONTEXTO GLOBAL (🔥 UMA VEZ)
+    # =========================
+    datas = [data for data, _, _ in dias_processados]
+    ctx = {
+        "mapa_indisp": montar_mapa_indisponibilidade(secao, datas)
+    }
+
+    # =========================
     # MODO FIXO
     # =========================
     if modo == "SEM":
         dias = escala.dias.prefetch_related("turnos__alocacoes")
 
         gerar_escala_semanal_fixa(
-            dias,
-            secao,
+            dias=dias,
+            secao=secao,
             qtd_operadores_semana=6,
             qtd_madrugada=qtd_madrugada,
             qtd_noturno=qtd_noturno,
             usar_reserva=True,
-            cursos_por_usuario=cursos_por_usuario  # 👈 ADICIONE ISSO AQUI
+            cursos_por_usuario=cursos_por_usuario,
         )
         return escala
 
     # =========================
-    # 2️⃣ ALOCAÇÃO PRINCIPAL
+    # 3️⃣ ALOCAÇÃO PRINCIPAL
     # =========================
     usados_global = {}
 
     for data, turno_codigo, turno in dias_processados:
-
         usados_no_dia = usados_global.setdefault(data, set())
 
         qtd = qtd_madrugada if turno_codigo == "MAD" else qtd_noturno
@@ -460,7 +407,6 @@ def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_notu
         if qtd == 0:
             continue
 
-        # 🟢 PASSANDO O DICIONÁRIO PARA O ALOCADOR
         alocar_turno(
             turno=turno,
             data=data,
@@ -470,18 +416,17 @@ def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_notu
             secao=secao,
             stats=stats,
             tipo="TIT",
-            cursos_por_usuario=cursos_por_usuario  # 👈 ADICIONE ISSO AQUI
+            cursos_por_usuario=cursos_por_usuario,
+            ctx=ctx
         )
 
     # =========================
-    # 3️⃣ VALIDAR NOT (OTIMIZADO)
+    # 4️⃣ VALIDAR NOT
     # =========================
     for data, turno_codigo, turno in dias_processados:
         if turno_codigo != "NOT" or qtd_noturno == 0:
             continue
 
-        # 🟢 TROCAMOS O turno.alocacoes.filter(...).exists() por uma busca em memória
-        # Isso evita 7 idas ao banco de dados no final do algoritmo!
         ja_tem_habilitado = any(
             "MAN" in cursos_por_usuario.get(aloc.usuario_id, set())
             for aloc in turno.alocacoes.all()
@@ -494,13 +439,11 @@ def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_notu
             )
 
     # =========================
-    # 4️⃣ RESERVAS
+    # 5️⃣ RESERVAS
     # =========================
     for data, turno_codigo, turno in dias_processados:
-
         usados_no_dia = usados_global.setdefault(data, set())
 
-        # 🟢 PASSANDO O DICIONÁRIO PARA O ALOCADOR DE RESERVAS
         alocar_turno(
             turno=turno,
             data=data,
@@ -510,11 +453,11 @@ def gerar_escala_semanal(secao, data_inicio, criada_por, qtd_madrugada, qtd_notu
             secao=secao,
             stats=stats,
             tipo="RES",
-            cursos_por_usuario=cursos_por_usuario  # 👈 ADICIONE ISSO AQUI TAMBÉM
+            cursos_por_usuario=cursos_por_usuario,
+            ctx=ctx
         )
 
     return escala
-
 @transaction.atomic
 def encerrar_escala(escala, usuario):
     if escala.status != Escala.Status.PUBLICADA:

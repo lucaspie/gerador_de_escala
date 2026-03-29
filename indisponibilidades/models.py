@@ -7,12 +7,25 @@ User = settings.AUTH_USER_MODEL
 
 
 class Indisponibilidade(models.Model):
+    
+    class Status(models.TextChoices):
+        PENDENTE = "PEN", "Pendente"
+        APROVADA = "APR", "Aprovada"
+        RECUSADA = "REC", "Recusada"
+        
     class Motivo(models.TextChoices):
         MEDICA = "MED", "Consulta médica"
         FERIAS = "FER", "Férias"
         CURSO = "CUR", "Curso"
         FOLGA = "FOL", "Folga"
         OUTRO = "OUT", "Outro"
+        TACF = "TACF", "Tacf"
+        ESV = "ESV", "Entrando de serviço"
+        SSV = "SSV", "Saindo de servço"
+        DISP = "DISP", "Dispensa"
+        LIC = "LIC", "Licença"
+        COM = "COM", "Comissão"
+        MIS = "MIS", "Missão"
 
     usuario = models.ForeignKey(
         User,
@@ -24,8 +37,14 @@ class Indisponibilidade(models.Model):
     data_fim = models.DateField()
 
     motivo = models.CharField(
-        max_length=3,
+        max_length=5,
         choices=Motivo.choices,
+    )
+    
+    status = models.CharField(
+        max_length=3,
+        choices=Status.choices,
+        default=Status.PENDENTE,
     )
 
     observacao = models.CharField(

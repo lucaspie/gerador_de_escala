@@ -2,113 +2,146 @@
 {% block title %}Escala Semanal{% endblock %}
 
 {% block content %}
-<h3 class="mb-4">
-  Escala — {{ escala.secao.nome }}
-  <small class="text-muted">
-    {{ escala.data_inicio }} a {{ escala.data_fim }}
-  </small>
-  {% if pode_editar %}
-  <a href="{% url 'escalas:apagar_escala' escala.id %}" class="btn btn-outline-danger">
-    Apagar Escala
-  </a>
-  {% endif %}
+<div class="container my-5">
 
-</h3>
-
-{% for dia in escala.dias.all %}
-<div class="card mb-3">
-  <div class="card-header fw-bold">
-    {{ dia.data }} — {{ dia.get_tipo_dia_display }}
-
-    {% if alocacao.tipo == "SOBREAVISO" %}
-    <span class="badge bg-warning text-dark ms-2">
-      Sobreaviso
-    </span>
-    {% endif %}
-
-    {% if alocacao.foi_acionado %}
-    <span class="badge bg-danger ms-2">
-      Acionado
-    </span>
-    {% endif %}
-    {% if alocacao.tipo == "SOB" and not alocacao.foi_acionado %}
-    <a href="{% url 'escalas:acionar_sobreaviso' alocacao.id %}" class="btn btn-sm btn-danger">
-      ⚠️ Acionar
-    </a>
-    {% endif %}
-
-  </div>
-
-
-  <div class="card-body">
-    <div class="row">
-      {% for turno in dia.turnos.all %}
-      <div class="col-md-6">
-        <h5>{{ turno.get_turno_display }}</h5>
-
-        <ul class="list-group mb-2">
-          {% for alocacao in turno.alocacoes.all %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span>
-              {{ alocacao.usuario.username }}
-              {% if alocacao.tipo == "TIT" %}
-                <a href="{% url 'escalas:toggle_pisteiro' alocacao.id %}"
-                  class="btn btn-sm {% if alocacao.pisteiro %}btn-info{% else %}btn-outline-info{% endif %}">
-                  🎯 Pisteiro
-                </a>
-              {% endif %}
-              {% if turno.alocacoes.count == 0 %}
-                <li class="list-group-item text-muted">
-                  Nenhum militar escalado
-                </li>
-              {% endif %}
-
-              {% if alocacao.tipo == "RES" %}
-                <span class="badge bg-warning text-dark ms-2">Reserva</span>
-              {% endif %}
-          </span>
-          {% if alocacao.tipo == "RES" and not alocacao.foi_acionado and escala.status == "PUB" %}
-          <a href="{% url 'escalas:acionar_reserva' alocacao.id %}" class="btn btn-sm btn-danger ms-4">
-            ⚠️ Acionar Reserva
-          </a>
-          {% endif %}
-
-          {% if alocacao.tipo == "SOB" %}
-          <span class="badge bg-warning text-dark">Sobreaviso</span>
-
-          {% if not alocacao.foi_acionado and escala.status == "PUB" %}
-          <a href="{% url 'escalas:acionar_sobreaviso' alocacao.id %}" class="btn btn-sm btn-danger ms-2">
-            Acionar
-          </a>
-          {% else %}
-          <span class="badge bg-danger ms-2">ACIONADO</span>
-          {% endif %}
-          {% endif %}
-
-          <a href="{% url 'escalas:editar_turno' turno.id %}" class="btn btn-sm btn-outline-secondary">
-            Editar
-          </a>
-
-          </li>
-          {% empty %}
-          <li class="list-group-item text-muted">
-            Sem alocações
-          </li>
-          {% endfor %}
-        </ul>
-
-      </div>
-      {% endfor %}
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+    <div>
+      <span class="text-uppercase text-muted fw-bold fs-7">Escala de Serviço</span>
+      <h2 class="fw-bold text-dark mb-1">{{ escala.secao.nome }}</h2>
+      <span class="text-secondary">
+        <i class="bi bi-calendar3"></i> {{ escala.data_inicio|date:"d/m/Y" }} a {{ escala.data_fim|date:"d/m/Y" }}
+      </span>
+    </div>
+    
+    <div>
+      {% if escala.status == "PUB" %}
+        <span class="badge bg-success-subtle text-success px-3 py-2 rounded-pill">Publicada</span>
+      {% else %}
+        <span class="badge bg-warning-subtle text-warning px-3 py-2 rounded-pill">Rascunho</span>
+      {% endif %}
     </div>
   </div>
-</div>
-{% endfor %}
 
-{% if pode_editar %}
-<div class="d-flex gap-2 mt-4">
-  <a href="{% url 'escalas:publicar' escala.id %}" class="btn btn-success">
-    Publicar Escala
-  </a>
+  <hr class="mb-4 text-muted opacity-25">
+
+  {% for dia in escala.dias.all %}
+  <div class="card shadow-sm border-0 mb-4">
+    
+    <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="mb-0 fw-bold text-primary d-inline">{{ dia.data|date:"l, d/m"|capfirst }}</h5>
+        <span class="badge bg-light text-secondary border ms-2">{{ dia.get_tipo_dia_display }}</span>
+      </div>
+    </div>
+
+    <div class="card-body bg-light-subtle p-3">
+      <div class="row g-3">
+        
+        {% for turno in dia.turnos.all %}
+        <div class="col-md-6">
+          <div class="bg-white p-3 rounded-3 border h-100 shadow-sm">
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="fw-bold text-secondary mb-0">
+                <i class="bi bi-clock me-1"></i> {{ turno.get_turno_display }}
+              </h6>
+              <a href="{% url 'escalas:editar_turno' turno.id %}" class="btn btn-sm btn-outline-secondary py-1 px-2 fs-7">
+                Editar
+              </a>
+            </div>
+
+            <ul class="list-group list-group-flush">
+              {% for alocacao in turno.alocacoes.all %}
+              <li class="list-group-item px-0 d-flex justify-content-between align-items-center bg-transparent">
+                
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="fw-semibold text-dark">{{ alocacao.usuario.username }}</span>
+                  
+                  {% if alocacao.tipo == "TIT" %}
+                    <a href="{% url 'escalas:toggle_pisteiro' alocacao.id %}"
+                       class="btn btn-sm py-0 px-2 fs-7 rounded-pill {% if alocacao.pisteiro %}btn-info text-white{% else %}btn-outline-info{% endif %}">
+                      🎯 Pisteiro
+                    </a>
+                  {% endif %}
+
+                  {% if alocacao.tipo == "RES" %}
+                    <span class="badge bg-warning-subtle text-warning-dark fs-7">Reserva</span>
+                  {% endif %}
+
+                  {% if alocacao.tipo == "SOB" %}
+                    <span class="badge bg-secondary-subtle text-secondary fs-7">Sobreaviso</span>
+                  {% endif %}
+                </div>
+
+                <div>
+                  {% if alocacao.foi_acionado %}
+                    <span class="badge bg-danger rounded-pill px-2 py-1 fs-7">🚨 Acionado</span>
+                  {% else %}
+                    
+                    {% if alocacao.tipo == "RES" and escala.status == "PUB" %}
+                      <a href="{% url 'escalas:acionar_reserva' alocacao.id %}" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7">
+                        Acionar
+                      </a>
+                    {% endif %}
+
+                    {% if alocacao.tipo == "SOB" and escala.status == "PUB" %}
+                      <a href="{% url 'escalas:acionar_sobreaviso' alocacao.id %}" class="btn btn-sm btn-outline-danger py-0 px-2 fs-7">
+                        Acionar
+                      </a>
+                    {% endif %}
+
+                  {% endif %}
+                </div>
+
+              </li>
+              {% empty %}
+              <li class="text-muted fs-7 py-2">
+                <i class="bi bi-info-circle"></i> Sem alocações neste turno
+              </li>
+              {% endfor %}
+            </ul>
+
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center text-muted py-3">
+          Nenhum turno cadastrado para este dia.
+        </div>
+        {% endfor %}
+        
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if pode_editar %}
+  <div class="card border-0 shadow-sm mt-5 bg-white">
+    <div class="card-body d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+      <div>
+        <h6 class="fw-bold mb-1">Ações de Gerenciamento</h6>
+        <p class="text-muted mb-0 fs-7">Publique para que a equipe veja ou apague o rascunho atual.</p>
+      </div>
+      <div class="d-flex gap-2">
+        {% if escala.status != "PUB" %}
+          <a href="{% url 'escalas:publicar' escala.id %}" class="btn btn-success px-4">
+            🚀 Publicar Escala
+          </a>
+        {% endif %}
+        <a href="{% url 'escalas:apagar_escala' escala.id %}" class="btn btn-outline-danger px-4" 
+           onclick="return confirm('Tem certeza que deseja apagar toda a escala? Esta ação não pode ser desfeita.')">
+          Apagar Escala
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
-{% endif %}
+
+<style>
+  .fs-7 { font-size: 0.75rem !important; }
+  .text-warning-dark { color: #856404; }
+  .list-group-item { border-bottom: 1px solid rgba(0,0,0,.05); }
+  .list-group-item:last-child { border-bottom: 0; }
+</style>
 {% endblock %}

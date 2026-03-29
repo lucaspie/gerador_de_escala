@@ -78,7 +78,9 @@ def test_simulacao_6_meses_fairness(
     operadores = criar_operadores(15)  # número realista
 
     # 🔥 MOCK: Criamos o dicionário de cursos que a função otimizada exige
-    mapa_cursos = cursos_mockados(operadores)
+    mapa_cursos = cursos_mockados(
+        User.objects.filter(secao=secao, papel=User.Papel.OPERADOR)
+    )
 
     contagem = Counter()
     data_base = date(2026, 1, 5)
@@ -91,7 +93,7 @@ def test_simulacao_6_meses_fairness(
             criada_por=admin_user,
             qtd_madrugada=0,
             qtd_noturno=2,
-            modo="SEM",
+            modo="DIN",
             cursos_por_usuario=mapa_cursos,  # 👈 Passando o dicionário aqui!
         )
 
@@ -99,7 +101,7 @@ def test_simulacao_6_meses_fairness(
         escala.status = Escala.Status.PUBLICADA
         escala.save()
 
-        for dia in escala.dias.all():
+        for dia in escala.dias.prefetch_related("turnos__alocacoes"):
             for turno in dia.turnos.all():
                 for aloc in turno.alocacoes.filter(tipo="TIT"):
                     contagem[aloc.usuario.username] += 1
@@ -138,7 +140,7 @@ def test_mesmos_operadores_todos_os_dias(
 
     operadores_por_dia = []
 
-    for dia in escala.dias.all():
+    for dia in escala.dias.prefetch_related("turnos__alocacoes"):
         if dia.tipo_dia == "VERMELHA":
             continue
 
@@ -187,7 +189,7 @@ def test_substituicao_por_indisponibilidade(
 
     operadores_por_dia = []
 
-    for dia in escala.dias.all():
+    for dia in escala.dias.prefetch_related("turnos__alocacoes"):
         if dia.tipo_dia == "VERMELHA":
             continue
 
@@ -205,3 +207,33 @@ def test_substituicao_por_indisponibilidade(
             continue
 
         assert ops_dia == operadores_por_dia[0][1]
+        
+        
+@pytest.mark.django_db
+def test_indisponibilidade_respeitada(secao, admin_user, criar_operadores, cursos_mockados):
+    ops = criar_operadores(3)
+    mapa_cursos = cursos_mockados(ops)
+
+    from indisponibilidades.models import Indisponibilidade
+
+    Indisponibilidade.objects.create(
+        usuario=ops[0],
+        data_inicio=date(2026, 1, 5),
+        data_fim=date(2026, 1, 5),
+    )
+
+    escala = gerar_escala_semanal(
+        secao=secao,
+        data_inicio=date(2026, 1, 5),
+        criada_por=admin_user,
+        qtd_madrugada=0,
+        qtd_noturno=1,
+        cursos_por_usuario=mapa_cursos,
+    )
+
+    for dia in escala.dias.all():
+        for turno in dia.turnos.all():
+            for aloc in turno.alocacoes.all():
+                assert not (
+                    aloc.usuario == ops[0] and dia.data == date(2026, 1, 5)
+                )

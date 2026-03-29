@@ -2,44 +2,140 @@
 {% block title %}Indisponibilidades da Seção{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container my-5">
 
-  <h3 class="mb-3">🚫 Indisponibilidades da Seção</h3>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-secondary">🗓️ Indisponibilidades da Seção</h2>
+  </div>
 
-  {% if indisponibilidades %}
-  <table class="table table-bordered table-hover">
-    <thead class="table-light">
-      <tr>
-        <th>Operador</th>
-        <th>Início</th>
-        <th>Fim</th>
-        <th>Motivo</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for i in indisponibilidades %}
-      <tr>
-        <td>{{ i.usuario.get_full_name|default:i.usuario.username }}</td>
-        <td>{{ i.data_inicio|date:"d/m/Y" }}</td>
-        <td>{{ i.data_fim|date:"d/m/Y" }}</td>
-        <td>{{ i.motivo|default:"—" }}</td>
-        <td>
-          {% if i.aprovada %}
-            <span class="badge bg-success">Aprovada</span>
-          {% else %}
-            <span class="badge bg-warning text-dark">Pendente</span>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-    <div class="alert alert-info">
-      Nenhuma indisponibilidade cadastrada na seção.
+  <div class="card shadow-sm border-0 mb-5">
+    <div class="card-header bg-white py-3 border-0">
+      <h5 class="card-title mb-0 fw-bold text-primary">📌10 dias antes e Próximos 10 dias</h5>
     </div>
-  {% endif %}
+    
+    <div class="card-body p-0">
+      {% if proximas %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light text-uppercase fs-7 text-muted">
+            <tr>
+              <th class="ps-4">Operador</th>
+              <th>Início</th>
+              <th>Fim</th>
+              <th>Motivo</th>
+              <th class="text-center pe-4">Status / Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in proximas %}
+            <tr class="{% if i.status == 'PEN' %}table-warning{% endif %}">
+              <td class="ps-4 fw-semibold text-dark">
+                {{ i.usuario.get_full_name|default:i.usuario.username }}
+              </td>
+              <td>{{ i.data_inicio|date:"d/m/Y" }}</td>
+              <td>{{ i.data_fim|date:"d/m/Y" }}</td>
+              <td><span class="text-secondary">{{ i.get_motivo_display }}</span></td>
+              <td class="text-center pe-4">
+                {% if i.status == "PEN" %}
+                <div class="d-flex justify-content-center gap-2">
+                  <form method="post" action="{% url 'indisponibilidades:aprovar' i.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-success px-3" title="Aprovar">
+                      ✓ Aprovar
+                    </button>
+                  </form>
+                  <form method="post" action="{% url 'indisponibilidades:recusar' i.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger px-3" title="Recusar">
+                      ✕ Recusar
+                    </button>
+                  </form>
+                </div>
+                {% else %}
+                  <span class="badge rounded-pill px-3 py-2 
+                    {% if i.status == 'APR' %}bg-success-subtle text-success
+                    {% elif i.status == 'REC' %}bg-danger-subtle text-danger
+                    {% else %}bg-secondary-subtle text-secondary{% endif %}">
+                      {{ i.get_status_display }}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center text-muted">
+        <i class="bi bi-calendar-check fs-2 d-block mb-2"></i>
+        Nenhuma indisponibilidade registrada para os próximos dias.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold text-secondary mb-0">📚 Todas as Indisponibilidades</h5>
+    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#todas">
+      Alternar Visualização
+    </button>
+  </div>
+
+  <div id="todas" class="collapse">
+    <div class="card shadow-sm border-0">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light text-uppercase fs-7 text-muted">
+              <tr>
+                <th class="ps-4">Operador</th>
+                <th>Início</th>
+                <th>Fim</th>
+                <th>Motivo</th>
+                <th class="text-center pe-4">Status / Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in todas %}
+              <tr>
+                <td class="ps-4">{{ i.usuario.get_full_name|default:i.usuario.username }}</td>
+                <td>{{ i.data_inicio|date:"d/m/Y" }}</td>
+                <td>{{ i.data_fim|date:"d/m/Y" }}</td>
+                <td class="text-muted">{{ i.get_motivo_display }}</td>
+                <td class="text-center pe-4">
+                  {% if i.status == "PEN" %}
+                  <div class="d-flex justify-content-center gap-2">
+                    <form method="post" action="{% url 'indisponibilidades:aprovar' i.id %}">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-success btn-icon" title="Aprovar">✓</button>
+                    </form>
+                    <form method="post" action="{% url 'indisponibilidades:recusar' i.id %}">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-danger btn-icon" title="Recusar">✕</button>
+                    </form>
+                  </div>
+                  {% else %}
+                    <span class="badge rounded-pill px-2 py-1 fs-7
+                      {% if i.status == 'APR' %}bg-success-subtle text-success
+                      {% elif i.status == 'REC' %}bg-danger-subtle text-danger
+                      {% else %}bg-secondary-subtle text-secondary{% endif %}">
+                        {{ i.get_status_display }}
+                    </span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
+
+<style>
+  .fs-7 { font-size: 0.75rem; }
+  .btn-icon { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
+</style>
 {% endblock %}
