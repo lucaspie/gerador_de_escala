@@ -463,7 +463,7 @@ def toggle_pisteiro(request, alocacao_id):
         return redirect("escalas:detalhe_escala", escala.id)
 
     # Só titular pode ser pisteiro
-    if alocacao.tipo != "TIT":
+    if alocacao.tipo == "RES" and alocacao.foi_acionado == False :
         messages.error(request, "Apenas titulares podem ser pisteiro.")
         return redirect("escalas:detalhe_escala", escala.id)
 

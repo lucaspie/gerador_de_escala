@@ -57,7 +57,7 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <span class="fw-semibold text-dark">{{ alocacao.usuario.username }}</span>
                   
-                  {% if alocacao.tipo == "TIT" %}
+                  {% if alocacao.tipo == "TIT" or alocacao.virou_titular %}
                     <a href="{% url 'escalas:toggle_pisteiro' alocacao.id %}"
                        class="btn btn-sm py-0 px-2 fs-7 rounded-pill {% if alocacao.pisteiro %}btn-info text-white{% else %}btn-outline-info{% endif %}">
                       🎯 Pisteiro
@@ -75,6 +75,10 @@
 
                 <div>
                   {% if alocacao.foi_acionado %}
+                  <a href="{% url 'escalas:toggle_pisteiro' alocacao.id %}"
+                       class="btn btn-sm py-0 px-2 fs-7 rounded-pill {% if alocacao.pisteiro %}btn-info text-white{% else %}btn-outline-info{% endif %}">
+                      🎯 Pisteiro
+                    </a>
                     <span class="badge bg-danger rounded-pill px-2 py-1 fs-7">🚨 Acionado</span>
                   {% else %}
                     
